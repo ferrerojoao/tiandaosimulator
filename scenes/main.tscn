@@ -10,6 +10,7 @@
 [ext_resource type="TileSet" uid="uid://d3rfpg0q3siuq" path="res://assets/tiles/terrain_tileset.tres" id="8_tileset"]
 [ext_resource type="Script" uid="uid://chj4cm5qacnak" path="res://scripts/world/cultivator_spawner.gd" id="9_spawn"]
 [ext_resource type="Script" path="res://scripts/ui/info_panel.gd" id="11_infop"]
+[ext_resource type="Script" path="res://scripts/ui/menu.gd" id="14_menu"]
 
 [node name="main" type="Node2D" unique_id=1177366983]
 script = ExtResource("1_o6xl0")
@@ -160,3 +161,49 @@ text = "行3"
 [node name="LblLine4" type="Label" parent="UI/CultivatorInfo/VBoxContainer" unique_id=300000007]
 layout_mode = 2
 text = "行4"
+
+[node name="Menu" type="Control" parent="UI" unique_id=400000001]
+layout_mode = 2
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("14_menu")
+
+[node name="ColorRect" type="ColorRect" parent="UI/Menu" unique_id=400000002]
+layout_mode = 2
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.06, 0.08, 0.15, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/Menu" unique_id=400000003]
+layout_mode = 2
+anchor_left = 0.5
+anchor_right = 0.5
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -120.0
+offset_right = 200.0
+offset_bottom = 120.0
+
+[node name="Title" type="Label" parent="UI/Menu/VBoxContainer" unique_id=400000004]
+layout_mode = 2
+text = "修仙世界模拟器"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="UI/Menu/VBoxContainer" unique_id=400000005]
+layout_mode = 2
+
+[node name="BtnNew" type="Button" parent="UI/Menu/VBoxContainer" unique_id=400000006]
+layout_mode = 2
+text = "新游戏"
+custom_minimum_size = Vector2(200, 40)
+
+[node name="BtnLoad" type="Button" parent="UI/Menu/VBoxContainer" unique_id=400000007]
+layout_mode = 2
+text = "读档"
+custom_minimum_size = Vector2(200, 40)
+
+[node name="BtnQuit" type="Button" parent="UI/Menu/VBoxContainer" unique_id=400000008]
+layout_mode = 2
+text = "退出游戏"
+custom_minimum_size = Vector2(200, 40)

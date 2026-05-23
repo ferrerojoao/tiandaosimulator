@@ -20,6 +20,7 @@ const LIFESPAN: Array[int] = [150, 300, 800, 2000, 5000, 9999]
 
 # 突破所需灵气阈值
 const BREAK_SPIRIT: Array[float] = [0.0, 0.3, 0.5, 0.7, 1.0, 1.0]
+const BREAK_DURATION: Array[int] = [3, 5, 8, 12, 20, 50]
 
 # 基础属性
 var cultivator_name: String
@@ -58,6 +59,7 @@ var cursed_ticks: int = 0
 var is_breaking_through: bool = false
 var breakthrough_progress: float = 0.0
 var injured_ticks: int = 0
+var ai_goal: String = "游历"
 
 # 生涯大事
 var life_events: Array = []  # [{year, text}]
@@ -162,7 +164,7 @@ func _on_tick(_year: int, _season: int) -> void:
 	
 	if is_breaking_through:
 		breakthrough_progress += 1.0
-		if breakthrough_progress >= 3.0:
+		if breakthrough_progress >= BREAK_DURATION[realm]:
 			_finish_breakthrough()
 		return
 	
@@ -183,6 +185,8 @@ func _attempt_breakthrough() -> void:
 	
 	is_breaking_through = true
 	breakthrough_progress = 0.0
+	cultivation_exp = EXP_TO_NEXT[realm]  # 锁定满值
+	ai_goal = "闭关中"
 	var eb = get_node_or_null("/root/EventBus")
 	if eb:
 		eb.event_log_entry.emit("%s 开始突破 %s" % [cultivator_name, REALM_NAMES[realm + 1]], "cult")
@@ -265,11 +269,146 @@ func _finish_breakthrough() -> void:
 
 func _process(delta: float) -> void:
 	if not alive: return
+	if is_breaking_through: return  # 闭关中不移动
 	wander_cooldown -= delta
 	if wander_cooldown <= 0.0:
-		_pick_wander_target()
+		_decide_behavior()
 	if position.distance_to(wander_target) > 4.0:
 		position = position.move_toward(wander_target, move_speed * delta)
+
+func _decide_behavior() -> void:
+	# 1. 逃命
+	if injured_ticks > 0:
+		var danger = _find_nearby_threat()
+		if danger:
+			ai_goal = "逃命"
+			_flee_from(danger)
+			return
+	
+	# 2. 闭关
+	if _can_breakthrough_now():
+		ai_goal = "准备闭关"
+		_attempt_breakthrough()
+		wander_cooldown = 99.0
+		return
+	
+	# 3. 筹备
+	if cultivation_exp >= EXP_TO_NEXT[realm]:
+		ai_goal = "筹备突破"
+		var target = _find_breakthrough_prep_target()
+		if target:
+			wander_target = target
+			wander_cooldown = randf_range(2.0, 4.0)
+			return
+	
+	# 4. 回宗
+	if injured_ticks > 0 and sect != "":
+		ai_goal = "回宗养伤"
+		var sect_pos = _find_sect_pos()
+		if sect_pos:
+			wander_target = sect_pos
+			wander_cooldown = randf_range(3.0, 5.0)
+			return
+	
+	# 5. 寻灵
+	if cultivation_exp < EXP_TO_NEXT[realm]:
+		ai_goal = "寻灵修炼"
+		var spirit_target = _find_high_spirit()
+		if spirit_target:
+			wander_target = spirit_target
+			wander_cooldown = randf_range(2.0, 4.0)
+			return
+	
+	# 6. 游历
+	ai_goal = "游历"
+	if sect != "" and randf() < 0.6:
+		var sect_pos = _find_sect_pos()
+		if sect_pos:
+			wander_target = sect_pos + Vector2(randf_range(-80, 80), randf_range(-80, 80))
+			wander_target.x = clampf(wander_target.x, 16, 6384)
+			wander_target.y = clampf(wander_target.y, 16, 6384)
+			wander_cooldown = randf_range(3.0, 6.0)
+			return
+	
+	_pick_wander_target()
+
+func _can_breakthrough_now() -> bool:
+	if realm >= Realm.TRIBULATION: return false
+	if cultivation_exp < EXP_TO_NEXT[realm]: return false
+	var required: float = BREAK_SPIRIT[realm]
+	var wm = get_node_or_null("/root/main/WorldMap")
+	if not wm: return false
+	var tx: int = int(position.x / 32.0)
+	var ty: int = int(position.y / 32.0)
+	if wm.get_spirit_density(tx, ty) < required: return false
+	return true
+
+func _find_nearby_threat():
+	var spawner = get_parent()
+	if not spawner: return null
+	for other in spawner.get_children():
+		if other == self: continue
+		if not other.get("alive"): continue
+		if other.get("realm") == null: continue
+		if position.distance_to(other.position) > 120: continue
+		if other.get_combat_power() > get_combat_power():
+			return other
+	return null
+
+func _flee_from(threat) -> void:
+	var dir: Vector2 = position - threat.position
+	if dir.length() < 1: dir = Vector2(randf_range(-1, 1), randf_range(-1, 1))
+	dir = dir.normalized()
+	wander_target = position + dir * 200.0
+	wander_target.x = clampf(wander_target.x, 16, 6384)
+	wander_target.y = clampf(wander_target.y, 16, 6384)
+	wander_cooldown = randf_range(1.0, 2.0)
+
+func _find_breakthrough_prep_target():
+	var wm = get_node_or_null("/root/main/WorldMap")
+	if not wm: return null
+	var required: float = BREAK_SPIRIT[realm]
+	# 走向灵气最高的区域
+	var best_score: float = -1.0
+	var best_pos: Vector2
+	for _try in 30:
+		var x: int = randi_range(0, 199)
+		var y: int = randi_range(0, 199)
+		var d: float = wm.get_spirit_density(x, y)
+		var dist: float = position.distance_to(Vector2(x * 32, y * 32))
+		var score: float = d - dist / 6400.0
+		if score > best_score:
+			best_score = score
+			best_pos = Vector2(x * 32 + 16, y * 32 + 16)
+	if best_score > 0: return best_pos
+	return null
+
+func _find_sect_pos():
+	var spawner = get_parent()
+	if not spawner: return null
+	for node in spawner.get_children():
+		if node.get("sect_name") == sect:
+			return node.position
+	return null
+
+func _find_high_spirit():
+	var wm = get_node_or_null("/root/main/WorldMap")
+	if not wm: return null
+	var best_d: float = -1.0
+	var best_pos: Vector2
+	for _try in 20:
+		var ox: float = randf_range(-50, 50)
+		var oy: float = randf_range(-50, 50)
+		var tx: int = int((position.x + ox) / 32.0)
+		var ty: int = int((position.y + oy) / 32.0)
+		tx = clampi(tx, 0, 199)
+		ty = clampi(ty, 0, 199)
+		var d: float = wm.get_spirit_density(tx, ty)
+		if d > best_d:
+			best_d = d
+			best_pos = Vector2(tx * 32 + 16, ty * 32 + 16)
+	if best_pos: return best_pos
+	return null
 
 func _pick_wander_target() -> void:
 	wander_target = position + Vector2(randf_range(-200, 200), randf_range(-200, 200))
@@ -316,6 +455,7 @@ func _check_combat() -> void:
 		if other.get("realm") == null: continue
 		if not other.get("alive"): continue
 		if position.distance_to(other.position) > 60: continue
+		if sect != "" and sect == other.get("sect"): continue  # 同宗不战
 		var my_power: float = get_combat_power()
 		var other_power: float = other.get_combat_power()
 		if my_power <= other_power: continue  # 我方弱，不主动出手

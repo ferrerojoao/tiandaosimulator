@@ -15,6 +15,16 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	$Overlay.draw.connect(_on_draw)
 
+func reload_data() -> void:
+	var wm = get_node_or_null("/root/main/WorldMap")
+	if wm and wm.terrain_map and wm.terrain_map.size() > 0:
+		_terrain = wm.terrain_map.duplicate(true)
+		_sects = wm.sect_positions.duplicate()
+		_vills = wm.village_positions.duplicate()
+		_loaded = true
+		await get_tree().process_frame
+		$Overlay.queue_redraw()
+
 func _process(_delta: float) -> void:
 	if _loaded:
 		$Overlay.queue_redraw()
@@ -44,7 +54,7 @@ func _on_draw() -> void:
 		for x in _terrain[y].size():
 			overlay.draw_rect(
 				Rect2(x * sx, y * sy, sx + 1, sy + 1),
-				colors.get(_terrain[y][x], Color.BLACK), true
+				colors.get(int(_terrain[y][x]), Color.BLACK), true
 			)
 	
 	# 宗门

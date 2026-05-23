@@ -19,6 +19,7 @@ const ELEMENT_NAMES: Array = ["无", "金", "木", "水", "火", "土"]
 const ELEMENT_COLORS: Array = [
 	Color.WHITE, Color.GOLD, Color.GREEN, Color.CYAN, Color.ORANGE_RED, Color.SADDLE_BROWN
 ]
+const TERRAIN_NAMES: Array = ["深海", "浅水", "沙地", "平原", "草原", "森林", "山脉", "高山", "沼泽", "灵脉", "宗门", "村落"]
 
 var terrain_map: Array = []
 var spirit_density_map: Array = []
@@ -39,10 +40,9 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var _world_generated: bool = false
 
 func _ready() -> void:
-	print("[WorldMap] _ready() 开始")
 	_rng.randomize()
 	_init_noise()
-	generate_world()
+	# generate_world() 由 main 菜单触发
 
 func _init_noise() -> void:
 	_noise_continent = FastNoiseLite.new()
@@ -367,6 +367,9 @@ func _place_villages() -> void:
 		terrain_map[candidate.y][candidate.x] = Terrain.VILLAGE
 
 func _render_tilemap() -> void:
+	render_tilemap()
+
+func render_tilemap() -> void:
 	tilemap.clear()
 	for y in MAP_HEIGHT:
 		for x in MAP_WIDTH:

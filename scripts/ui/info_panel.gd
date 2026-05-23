@@ -63,11 +63,7 @@ func _show_cult() -> void:
 	var c = _target
 	lbl_name.text = "%s" % c.get("cultivator_name")
 	lbl_line1.text = "%s · %s" % [c.get("REALM_NAMES")[c.get("realm")], c.get("sect") if c.get("sect") else "散修"]
-	var status: String = ""
-	if c.get("is_breaking_through"): status = "闭关中"
-	elif c.get("injured_ticks") > 0: status = "受伤"
-	else: status = "游历"
-	lbl_line2.text = "状态: %s" % status
+	lbl_line2.text = "目标: %s" % c.get("ai_goal")
 	lbl_line3.text = ""
 	lbl_line4.text = ""
 
@@ -93,8 +89,9 @@ func _show_tile() -> void:
 	if not wm: return
 	var density: float = wm.get_spirit_density(_tile_x, _tile_y)
 	var elem: int = wm.get_spirit_element(_tile_x, _tile_y)
-	lbl_name.text = "坐标 (%d, %d)" % [_tile_x, _tile_y]
-	lbl_line1.text = "灵气: %s" % ("▮".repeat(int(density * 10)) if density > 0 else "无")
-	lbl_line2.text = "属性: %s" % wm.ELEMENT_NAMES[elem]
-	lbl_line3.text = "浓度: %.0f%%" % (density * 100)
+	var terrain: int = wm.terrain_map[_tile_y][_tile_x] if wm.terrain_map.size() > _tile_y else 0
+	lbl_name.text = "%s (%d, %d)" % [wm.TERRAIN_NAMES[terrain], _tile_x, _tile_y]
+	lbl_line1.text = "灵气: %s 系 · %.0f%%" % [wm.ELEMENT_NAMES[elem], density * 100]
+	lbl_line2.text = ""
+	lbl_line3.text = ""
 	lbl_line4.text = ""

@@ -15,8 +15,13 @@ var _given_names: Array[String] = [
 ]
 
 func _ready() -> void:
-	# 如果世界已生成，直接创建；否则等信号
-	call_deferred("_try_spawn")
+	# 不再自动生成，由 main 菜单触发
+	pass
+
+func spawn_all() -> void:
+	var wm = get_node_or_null("/root/main/WorldMap")
+	if wm and wm.terrain_map and wm.terrain_map.size() > 0:
+		_do_spawn(wm)
 
 func _try_spawn() -> void:
 	var wm = get_node_or_null("/root/main/WorldMap")
