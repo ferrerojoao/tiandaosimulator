@@ -116,9 +116,9 @@ size_flags_horizontal = 3
 
 [node name="Minimap" type="PanelContainer" parent="UI" unique_id=1334960480]
 custom_minimum_size = Vector2(200, 200)
-offset_left = 950.0
+offset_left = 1700.0
 offset_top = 10.0
-offset_right = 950.0
+offset_right = 1700.0
 offset_bottom = 10.0
 script = ExtResource("7_trceg")
 
@@ -132,9 +132,9 @@ text = "小地图"
 
 [node name="CultivatorInfo" type="PanelContainer" parent="UI" unique_id=300000001]
 custom_minimum_size = Vector2(180, 140)
-offset_left = 950.0
+offset_left = 1700.0
 offset_top = 220.0
-offset_right = 950.0
+offset_right = 1700.0
 offset_bottom = 220.0
 script = ExtResource("11_infop")
 

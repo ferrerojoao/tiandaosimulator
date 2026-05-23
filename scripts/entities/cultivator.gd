@@ -24,6 +24,10 @@ var combat_cooldown: float = 0.0
 var wins: int = 0
 var losses: int = 0
 
+# 天道干预
+var blessed_ticks: int = 0
+var cursed_ticks: int = 0
+
 static var _icon_textures: Array[Texture2D] = []
 
 var wander_target: Vector2
@@ -41,6 +45,11 @@ func _draw() -> void:
 	if not alive: return
 	if is_selected:
 		draw_circle(Vector2.ZERO, 20, Color.GOLD, false, 2)
+	# 祝福/诅咒光环
+	if blessed_ticks > 0:
+		draw_circle(Vector2.ZERO, 18, Color.GOLD, false, 1)
+	if cursed_ticks > 0:
+		draw_circle(Vector2.ZERO, 18, Color.RED, false, 1)
 	if realm < _icon_textures.size() and _icon_textures[realm]:
 		draw_texture(_icon_textures[realm], Vector2(-16, -16))
 	else:
@@ -62,7 +71,17 @@ func _connect_time() -> void:
 func _on_tick(_year: int, _season: int) -> void:
 	if not alive: return
 	if realm >= Realm.DIVINE: return
-	cultivation_exp += CULT_SPEED[realm]
+	var speed_mult: float = 1.0
+	if blessed_ticks > 0:
+		speed_mult = 2.5
+		blessed_ticks -= 1
+	if cursed_ticks > 0:
+		speed_mult = 0.3
+		cursed_ticks -= 1
+		if randf() < 0.05:
+			die()
+			return
+	cultivation_exp += CULT_SPEED[realm] * speed_mult
 	if EXP_TO_NEXT[realm] > 0 and cultivation_exp >= EXP_TO_NEXT[realm]:
 		_breakthrough()
 	_check_combat()
@@ -72,6 +91,9 @@ func _breakthrough() -> void:
 	realm += 1
 	cultivation_exp = 0.0
 	queue_redraw()
+	var hm_gain: int = [5, 10, 20, 50, 100][old_realm]
+	var gt = get_node_or_null("/root/GameTime")
+	if gt: gt.add_hm(hm_gain)
 	var eb = get_node_or_null("/root/EventBus")
 	if eb:
 		eb.cultivator_breakthrough.emit(self, old_realm, realm)
@@ -96,6 +118,14 @@ func get_display_name() -> String:
 
 func set_selected(s: bool) -> void:
 	is_selected = s
+	queue_redraw()
+
+func bless(ticks: int) -> void:
+	blessed_ticks += ticks
+	queue_redraw()
+
+func curse(ticks: int) -> void:
+	cursed_ticks += ticks
 	queue_redraw()
 
 func get_combat_power() -> int:
@@ -131,6 +161,8 @@ func _check_combat() -> void:
 func die() -> void:
 	alive = false
 	visible = false
+	var gt = get_node_or_null("/root/GameTime")
+	if gt: gt.add_hm((realm + 1) * 3)
 	var eb = get_node_or_null("/root/EventBus")
 	if eb:
 		eb.cultivator_died.emit(self)

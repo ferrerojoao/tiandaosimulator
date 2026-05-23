@@ -10,12 +10,16 @@ func _ready() -> void:
 	_update_display()
 	GameTime.season_changed.connect(_on_season_changed)
 	GameTime.speed_changed.connect(_on_speed_changed)
+	GameTime.hm_changed.connect(_on_hm_changed)
 
 func _update_display() -> void:
 	year_label.text = "第 %d 年" % GameTime.current_year
 	season_label.text = "· %s季" % GameTime.get_season_name()
 	speed_label.text = "速度: %s" % _speed_name(GameTime.current_speed)
-	hm_label.text = "天道: 0"
+	hm_label.text = "天道: %d" % GameTime.heavenly_mechanism
+
+func _on_hm_changed(_val: int) -> void:
+	hm_label.text = "天道: %d" % _val
 
 func _on_season_changed(_year: int, _season: int, _name: String) -> void:
 	_update_display()

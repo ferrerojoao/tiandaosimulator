@@ -3,8 +3,8 @@ extends Camera2D
 
 const MAP_W: int = 6400
 const MAP_H: int = 6400
-const VP_W: int = 1280
-const VP_H: int = 720
+const VP_W: int = 1920
+const VP_H: int = 1080
 const PAN_SPEED: float = 800.0
 const ZOOM_MIN: float = 0.3
 const ZOOM_MAX: float = 3.0

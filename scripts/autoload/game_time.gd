@@ -17,12 +17,14 @@ var speed_multipliers: Dictionary = {
 var current_year: int = 1
 var current_season: int = 0
 var current_speed: int = Speed.NORMAL
+var heavenly_mechanism: int = 50
 var _tick_accumulator: float = 0.0
 
 signal season_changed(year: int, season: int, season_name: String)
 signal year_changed(year: int)
 signal speed_changed(new_speed: int)
 signal tick_advanced(year: int, season: int)
+signal hm_changed(amount: int)
 
 func _ready() -> void:
 	season_changed.emit(current_year, current_season, get_season_name())
@@ -52,6 +54,17 @@ func set_speed(new_speed: int) -> void:
 
 func toggle_pause() -> void:
 	set_speed(Speed.PAUSE if current_speed != Speed.PAUSE else Speed.NORMAL)
+
+func add_hm(amount: int) -> void:
+	heavenly_mechanism += amount
+	hm_changed.emit(heavenly_mechanism)
+
+func spend_hm(amount: int) -> bool:
+	if heavenly_mechanism >= amount:
+		heavenly_mechanism -= amount
+		hm_changed.emit(heavenly_mechanism)
+		return true
+	return false
 
 func is_paused() -> bool:
 	return current_speed == Speed.PAUSE

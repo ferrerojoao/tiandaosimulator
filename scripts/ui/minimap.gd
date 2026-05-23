@@ -3,8 +3,8 @@ extends PanelContainer
 
 const MAP_W: int = 200
 const MAP_H: int = 200
-const VP_W: int = 1280
-const VP_H: int = 720
+const VP_W: int = 1920
+const VP_H: int = 1080
 
 var _terrain: Array = []
 var _sects: Array = []
