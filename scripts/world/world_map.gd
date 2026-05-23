@@ -13,8 +13,17 @@ enum Terrain {
 	SECT_GROUND=10, VILLAGE=11
 }
 
+enum Element { NONE=0, METAL=1, WOOD=2, WATER=3, FIRE=4, EARTH=5 }
+
+const ELEMENT_NAMES: Array = ["无", "金", "木", "水", "火", "土"]
+const ELEMENT_COLORS: Array = [
+	Color.WHITE, Color.GOLD, Color.GREEN, Color.CYAN, Color.ORANGE_RED, Color.SADDLE_BROWN
+]
+
 var terrain_map: Array = []
-var spirit_qi_map: Array = []
+var spirit_density_map: Array = []
+var spirit_element_map: Array = []
+var sacred_sites: Array = []  # [{pos: Vector2i, element: int, name: String}]
 var sect_positions: Array = []
 var village_positions: Array = []
 var spirit_vein_positions: Array = []
@@ -71,7 +80,7 @@ func generate_world() -> void:
 	_world_generated = true
 	print("[WorldMap] 开始生成世界...")
 	_generate_terrain()
-	_collect_spirit_veins()
+	_generate_spirit_maps()
 	_place_sects()
 	_place_villages()
 	_render_tilemap()
@@ -143,49 +152,152 @@ func _generate_rivers() -> void:
 						terrain_map[wn.y][wn.x] = Terrain.SHALLOW_WATER
 
 func _trace_river(start: Vector2i, water: Array) -> Array:
-	var visited: Array = []
-	# 加权BFS：低处优先 + 避免笔直
-	var rng = RandomNumberGenerator.new()
-	rng.seed = _rng.randi()
-	var frontier: Array = [{"pos": start, "cost": 0.0}]
+	# BFS 找最短路径
+	var frontier: Array = [start]
 	var came_from: Dictionary = {}
-	came_from[start] = null
-	var cost_so_far: Dictionary = {start: 0.0}
+	came_from[start] = Vector2i(-1, -1)
 	var end: Vector2i
 	
 	while not frontier.is_empty():
-		var cur: Dictionary = frontier.pop_front()
-		var cp: Vector2i = cur["pos"]
-		if terrain_map[cp.y][cp.x] in water:
-			end = cp; break
+		var cur: Vector2i = frontier.pop_front()
+		if terrain_map[cur.y][cur.x] in water:
+			end = cur; break
 		for dy in [-1, 0, 1]:
 			for dx in [-1, 0, 1]:
 				if dx == 0 and dy == 0: continue
-				var nb: Vector2i = Vector2i(cp.x + dx, cp.y + dy)
+				var nb: Vector2i = Vector2i(cur.x + dx, cur.y + dy)
 				if not _in_bounds(nb) or nb in came_from: continue
-				var h: float = _norm(_noise_height.get_noise_2d(nb.x, nb.y))
-				var nc: float = cur["cost"] + 1.0 - h * 0.6 + rng.randf_range(-0.15, 0.15)
-				came_from[nb] = cp
-				cost_so_far[nb] = nc
-				# 廉价插入排序保持低开销
-				var idx: int = 0
-				while idx < frontier.size() and frontier[idx]["cost"] < nc:
-					idx += 1
-				frontier.insert(idx, {"pos": nb, "cost": nc})
+				came_from[nb] = cur
+				frontier.append(nb)
 	
-	if end == Vector2i(): return visited
+	if end == Vector2i(0, 0): return []
 	
+	# 回溯路径
+	var path: Array = []
 	var cur: Vector2i = end
-	while cur != start:
-		visited.append(cur)
+	while cur != start and cur in came_from:
+		path.append(cur)
 		cur = came_from[cur]
-	visited.append(start)
-	visited.reverse()
-	return visited
+	path.append(start)
+	path.reverse()
+	
+	# 中点位移 3 轮，产生蜿蜒
+	for _round in 3:
+		var curved: Array = []
+		for i in path.size() - 1:
+			var a: Vector2i = path[i]
+			var b: Vector2i = path[i + 1]
+			curved.append(a)
+			var mid: Vector2i = Vector2i((a.x + b.x) / 2, (a.y + b.y) / 2)
+			# 垂直于流向偏移 1~3 格
+			var dx: int = b.y - a.y
+			var dy: int = -(b.x - a.x)
+			var dist: int = abs(dx) + abs(dy)
+			if dist > 0:
+				var offset: int = randi_range(-3, 3)
+				if offset != 0:
+					mid.x = clampi(mid.x + round(dx * offset / dist), 0, MAP_WIDTH - 1)
+					mid.y = clampi(mid.y + round(dy * offset / dist), 0, MAP_HEIGHT - 1)
+			curved.append(mid)
+		curved.append(path[path.size() - 1])
+		path = curved
+	
+	return path
+
+func _generate_spirit_maps() -> void:
+	spirit_density_map.clear()
+	spirit_element_map.clear()
+	sacred_sites.clear()
+	
+	# 灵气浓度：基于灵气噪声 + 地形加成
+	var water_t: Array = [Terrain.DEEP_WATER, Terrain.SHALLOW_WATER]
+	for y in MAP_HEIGHT:
+		var d_row: Array = []
+		var e_row: Array = []
+		for x in MAP_WIDTH:
+			var s: float = _norm(_noise_spirit.get_noise_2d(x, y)) * 1.3
+			var t: int = terrain_map[y][x]
+			# 地形修正
+			if t == Terrain.HIGH_MOUNTAIN: s += 0.2
+			elif t == Terrain.MOUNTAIN: s += 0.1
+			elif t in water_t: s -= 0.4
+			var density: float = clampf(s, 0.0, 1.0)
+			d_row.append(density)
+			
+			# 属性：基于地形默认 + 噪声扰动
+			var elem: int = _terrain_element(t)
+			if randi() % 3 == 0 and density > 0.3:
+				elem = randi_range(1, 5)  # 随机洗牌
+			e_row.append(elem)
+		spirit_density_map.append(d_row)
+		spirit_element_map.append(e_row)
+	
+	_place_sacred_sites()
+
+func _terrain_element(terrain: int) -> int:
+	match terrain:
+		Terrain.MOUNTAIN, Terrain.HIGH_MOUNTAIN: return Element.METAL
+		Terrain.FOREST, Terrain.GRASSLAND: return Element.WOOD
+		Terrain.DEEP_WATER, Terrain.SHALLOW_WATER: return Element.WATER
+		Terrain.SAND: return Element.FIRE
+		Terrain.SWAMP, Terrain.PLAIN: return Element.EARTH
+	return Element.NONE
+
+func _place_sacred_sites() -> void:
+	var elem_terrain: Dictionary = {
+		Element.METAL: Terrain.MOUNTAIN,
+		Element.WOOD: Terrain.FOREST,
+		Element.WATER: Terrain.DEEP_WATER,
+		Element.FIRE: Terrain.SAND,
+		Element.EARTH: Terrain.PLAIN,
+	}
+	
+	for elem in [Element.METAL, Element.WOOD, Element.WATER, Element.FIRE, Element.EARTH]:
+		var wanted: int = elem_terrain.get(elem, Terrain.PLAIN)
+		var best_pos: Vector2i
+		var best_score: float = -1.0
+		
+		# 阶段1：优先在匹配地形上找
+		for _try in 200:
+			var x: int = _rng.randi_range(3, MAP_WIDTH - 4)
+			var y: int = _rng.randi_range(3, MAP_HEIGHT - 4)
+			if terrain_map[y][x] != wanted: continue
+			var density: float = spirit_density_map[y][x]
+			if density > best_score:
+				best_score = density
+				best_pos = Vector2i(x, y)
+		
+		# 阶段2：没找到匹配地形，退到任意陆地高灵区
+		if best_pos == Vector2i(0, 0):
+			for _try in 300:
+				var x: int = _rng.randi_range(3, MAP_WIDTH - 4)
+				var y: int = _rng.randi_range(3, MAP_HEIGHT - 4)
+				if terrain_map[y][x] in [Terrain.DEEP_WATER, Terrain.SHALLOW_WATER]: continue
+				var density: float = spirit_density_map[y][x]
+				if density > best_score:
+					best_score = density
+					best_pos = Vector2i(x, y)
+		
+		if best_pos == Vector2i(0, 0): continue
+		
+		spirit_density_map[best_pos.y][best_pos.x] = 1.0
+		spirit_element_map[best_pos.y][best_pos.x] = elem
+		var replacement: int = wanted
+		for dy in [-3, -2, -1, 0, 1, 2, 3]:
+			for dx in [-3, -2, -1, 0, 1, 2, 3]:
+				var nx: int = best_pos.x + dx
+				var ny: int = best_pos.y + dy
+				if _in_bounds(Vector2i(nx, ny)):
+					terrain_map[ny][nx] = replacement
+					spirit_density_map[ny][nx] = 1.0
+		sacred_sites.append({
+			"pos": best_pos,
+			"element": elem,
+			"name": ELEMENT_NAMES[elem] + "灵圣地"
+		})
+	print("[Spirit] %d 处圣地生成完毕" % sacred_sites.size())
 
 func _classify_land(h: float, m: float, s: float, _t: float) -> int:
-	if s > 0.72 and h > 0.35 and h < 0.85:
-		return Terrain.SPIRIT_VEIN
 	if h > 0.80: return Terrain.HIGH_MOUNTAIN
 	if h > 0.65: return Terrain.MOUNTAIN
 	if h > 0.40 and h < 0.47 and m > 0.55: return Terrain.SWAMP
@@ -228,22 +340,17 @@ func _collect_spirit_veins() -> void:
 
 func _place_sects() -> void:
 	sect_positions.clear()
-	if spirit_vein_positions.is_empty():
-		return
+	var water: Array = [Terrain.DEEP_WATER, Terrain.SHALLOW_WATER]
 	var attempts: int = 0
 	while sect_positions.size() < 6 and attempts < 2000:
 		attempts += 1
-		var vein: Vector2i = spirit_vein_positions[_rng.randi_range(0, spirit_vein_positions.size() - 1)]
-		var offset_dist: int = _rng.randi_range(3, 8)
-		var angle: float = _rng.randf() * TAU
-		var candidate: Vector2i = Vector2i(vein.x + int(cos(angle) * offset_dist), vein.y + int(sin(angle) * offset_dist))
-		if not _in_bounds(candidate): continue
-		var t: int = terrain_map[candidate.y][candidate.x]
-		if t == Terrain.DEEP_WATER or t == Terrain.SHALLOW_WATER or t == Terrain.HIGH_MOUNTAIN:
-			continue
-		if not _far_enough(candidate, sect_positions, 30): continue
-		sect_positions.append(candidate)
-		terrain_map[candidate.y][candidate.x] = Terrain.SECT_GROUND
+		var x: int = _rng.randi_range(5, MAP_WIDTH - 6)
+		var y: int = _rng.randi_range(5, MAP_HEIGHT - 6)
+		var t: int = terrain_map[y][x]
+		if t in water or t == Terrain.HIGH_MOUNTAIN: continue
+		if not _far_enough(Vector2i(x, y), sect_positions, 30): continue
+		sect_positions.append(Vector2i(x, y))
+		terrain_map[y][x] = Terrain.SECT_GROUND
 
 func _place_villages() -> void:
 	village_positions.clear()
@@ -285,3 +392,15 @@ func _far_enough(pos: Vector2i, others: Array, min_dist: int) -> bool:
 		if Vector2(pos.x, pos.y).distance_to(Vector2(other.x, other.y)) < min_dist:
 			return false
 	return true
+
+func get_spirit_density(tile_x: int, tile_y: int) -> float:
+	if spirit_density_map.is_empty(): return 0.0
+	if tile_y < 0 or tile_y >= spirit_density_map.size(): return 0.0
+	if tile_x < 0 or tile_x >= spirit_density_map[tile_y].size(): return 0.0
+	return spirit_density_map[tile_y][tile_x]
+
+func get_spirit_element(tile_x: int, tile_y: int) -> int:
+	if spirit_element_map.is_empty(): return Element.NONE
+	if tile_y < 0 or tile_y >= spirit_element_map.size(): return Element.NONE
+	if tile_x < 0 or tile_x >= spirit_element_map[tile_y].size(): return Element.NONE
+	return spirit_element_map[tile_y][tile_x]

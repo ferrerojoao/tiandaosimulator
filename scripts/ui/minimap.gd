@@ -55,6 +55,15 @@ func _on_draw() -> void:
 	for vil in _vills:
 		overlay.draw_rect(Rect2(vil.x * sx - 1, vil.y * sy - 1, 2, 2), Color.WHITE, true)
 	
+	# 圣地
+	var wm = get_node_or_null("/root/main/WorldMap")
+	if wm and wm.sacred_sites:
+		for site in wm.sacred_sites:
+			var sp: Vector2i = site["pos"]
+			var ec: int = site["element"]
+			var colors_arr = [Color.WHITE, Color.GOLD, Color.GREEN, Color.CYAN, Color.ORANGE_RED, Color.SADDLE_BROWN]
+			overlay.draw_circle(Vector2(sp.x * sx, sp.y * sy), 3, colors_arr[ec] if ec < colors_arr.size() else Color.WHITE)
+	
 	# 相机视口框
 	var cam = get_node_or_null("/root/main/Camera2D")
 	if cam:

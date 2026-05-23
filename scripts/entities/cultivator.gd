@@ -82,6 +82,13 @@ func _on_tick(_year: int, _season: int) -> void:
 			die()
 			return
 	cultivation_exp += CULT_SPEED[realm] * speed_mult
+	# 灵气浓度加成
+	var wm = get_node_or_null("/root/main/WorldMap")
+	if wm:
+		var tx: int = int(position.x / 32.0)
+		var ty: int = int(position.y / 32.0)
+		var sd: float = wm.get_spirit_density(tx, ty)
+		cultivation_exp += CULT_SPEED[realm] * sd * 0.5  # 浓度0.5相当于+25%
 	if EXP_TO_NEXT[realm] > 0 and cultivation_exp >= EXP_TO_NEXT[realm]:
 		_breakthrough()
 	_check_combat()

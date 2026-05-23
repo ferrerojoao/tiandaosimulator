@@ -10,6 +10,7 @@ signal cultivator_spawned(cultivator)
 signal cultivator_died(cultivator)
 signal cultivator_breakthrough(cultivator, old_realm: int, new_realm: int)
 signal cultivator_selected(cultivator)
+signal tile_selected(tile_x: int, tile_y: int)
 
 # 宗门事件
 signal sect_founded(sect)

@@ -34,7 +34,7 @@ func _left_click(world_pos: Vector2) -> void:
 	for node in spawner.get_children():
 		if not node.has_method("get_display_name"): continue
 		var d: float = world_pos.distance_to(node.position)
-		if node.get("sect_name") != null:
+		if node.get("sect_name") != null or node.get("site_name") != null:
 			if d < best_sect_dist:
 				best_sect_dist = d
 				best_sect = node
@@ -47,6 +47,13 @@ func _left_click(world_pos: Vector2) -> void:
 		_select_sect(best_sect)
 	elif best_cult:
 		_select_cultivator(best_cult)
+	else:
+		# 点到空地：显示灵气信息
+		var tx: int = int(world_pos.x / 32.0)
+		var ty: int = int(world_pos.y / 32.0)
+		var eb2 = get_node_or_null("/root/EventBus")
+		if eb2:
+			eb2.tile_selected.emit(tx, ty)
 
 func _right_click(world_pos: Vector2, screen_pos: Vector2) -> void:
 	var spawner = $CultivatorSpawner

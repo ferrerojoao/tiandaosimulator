@@ -38,6 +38,7 @@ func _do_spawn(wm: Node) -> void:
 		if pos == null: continue
 		_spawn_cultivator(pos, i)
 	_spawn_sects(wm)
+	_spawn_sacred_sites(wm)
 	_assign_to_sects()
 	print("[Spawner] 生成完成：%d 修士, %d 宗门" % [SPAWN_COUNT, wm.sect_positions.size()])
 
@@ -77,6 +78,18 @@ func _spawn_sects(wm: Node) -> void:
 		s.setup(i, world_pos)
 		add_child(s)
 	print("[Spawner] 生成了 %d 个宗门" % wm.sect_positions.size())
+
+func _spawn_sacred_sites(wm: Node) -> void:
+	var ss_script = load("res://scripts/entities/sacred_site.gd")
+	for site in wm.sacred_sites:
+		var tile_pos: Vector2i = site["pos"]
+		var world_pos: Vector2 = Vector2(tile_pos.x * 32 + 16, tile_pos.y * 32 + 16)
+		var s = Node2D.new()
+		s.set_script(ss_script)
+		s.name = "Sacred_%d" % site["element"]
+		s.setup(site["element"], site["name"], world_pos)
+		add_child(s)
+	print("[Spawner] 生成了 %d 个圣地" % wm.sacred_sites.size())
 
 func _find_spawn_pos(wm: Node) -> Variant:
 	for _attempt in 100:
