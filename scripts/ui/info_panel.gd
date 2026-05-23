@@ -1,4 +1,4 @@
-## info_panel.gd - 统一信息面板（修士/宗门）
+## info_panel.gd - 统一小面板（修士/宗门/圣地/空地）
 extends PanelContainer
 
 @onready var lbl_name: Label = $VBoxContainer/LblName
@@ -19,6 +19,15 @@ func _ready() -> void:
 		eb.tile_selected.connect(_on_tile_selected)
 	visible = false
 
+func _on_detail_pressed() -> void:
+	print("[InfoPanel] 详情按钮被点击")
+	var eb = get_node_or_null("/root/EventBus")
+	if eb and is_instance_valid(_target) and _target.get("cultivator_name") != null:
+		print("[InfoPanel] 发射信号")
+		eb.request_cultivator_detail.emit(_target)
+	else:
+		print("[InfoPanel] 条件不满足: eb=%s target=%s" % [eb != null, is_instance_valid(_target)])
+
 func _process(_delta: float) -> void:
 	if _tile_x >= 0:
 		_show_tile()
@@ -34,12 +43,6 @@ func _process(_delta: float) -> void:
 	elif _target.get("cultivator_name") != null:
 		_show_cult()
 
-func _on_tile_selected(tx: int, ty: int) -> void:
-	_target = null
-	_tile_x = tx
-	_tile_y = ty
-	visible = true
-
 func _on_cultivator_selected(c: Node) -> void:
 	_target = c
 	_tile_x = -1
@@ -50,17 +53,23 @@ func _on_sect_selected(s: Node) -> void:
 	_tile_x = -1
 	visible = s != null
 
+func _on_tile_selected(tx: int, ty: int) -> void:
+	_target = null
+	_tile_x = tx
+	_tile_y = ty
+	visible = true
+
 func _show_cult() -> void:
 	var c = _target
 	lbl_name.text = "%s" % c.get("cultivator_name")
-	lbl_line1.text = "境界: %s" % c.get("REALM_NAMES")[c.get("realm")]
-	lbl_line2.text = "年龄: %d 岁 · %s" % [c.get("age"), c.get("sect") if c.get("sect") else "散修"]
-	var next_exp: float = c.get("EXP_TO_NEXT")[c.get("realm")] if c.get("realm") < c.get("EXP_TO_NEXT").size() else -1
-	if next_exp > 0:
-		lbl_line3.text = "修为: %.0f / %.0f" % [c.get("cultivation_exp"), next_exp]
-	else:
-		lbl_line3.text = "修为: %.0f (圆满)" % c.get("cultivation_exp")
-	lbl_line4.text = "战绩: %d胜 %d败" % [c.get("wins"), c.get("losses")]
+	lbl_line1.text = "%s · %s" % [c.get("REALM_NAMES")[c.get("realm")], c.get("sect") if c.get("sect") else "散修"]
+	var status: String = ""
+	if c.get("is_breaking_through"): status = "闭关中"
+	elif c.get("injured_ticks") > 0: status = "受伤"
+	else: status = "游历"
+	lbl_line2.text = "状态: %s" % status
+	lbl_line3.text = ""
+	lbl_line4.text = ""
 
 func _show_sect() -> void:
 	var s = _target
@@ -84,7 +93,6 @@ func _show_tile() -> void:
 	if not wm: return
 	var density: float = wm.get_spirit_density(_tile_x, _tile_y)
 	var elem: int = wm.get_spirit_element(_tile_x, _tile_y)
-	var terrain: int = wm.terrain_map[_tile_y][_tile_x] if wm.terrain_map.size() > _tile_y and wm.terrain_map[_tile_y].size() > _tile_x else 0
 	lbl_name.text = "坐标 (%d, %d)" % [_tile_x, _tile_y]
 	lbl_line1.text = "灵气: %s" % ("▮".repeat(int(density * 10)) if density > 0 else "无")
 	lbl_line2.text = "属性: %s" % wm.ELEMENT_NAMES[elem]

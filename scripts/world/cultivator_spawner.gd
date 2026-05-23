@@ -118,9 +118,8 @@ func _random_name() -> String:
 
 func _random_realm() -> int:
 	var roll: float = randf()
-	if roll < 0.40:   return 0  # 凡人 40%
-	if roll < 0.70:   return 1  # 炼气 30%
-	if roll < 0.88:   return 2  # 筑基 18%
-	if roll < 0.96:   return 3  # 金丹 8%
-	if roll < 0.99:   return 4  # 元婴 3%
-	return 5                      # 化神 1%
+	if roll < 0.45:   return 0  # 炼气 45%
+	if roll < 0.75:   return 1  # 筑基 30%
+	if roll < 0.92:   return 2  # 金丹 17%
+	if roll < 0.98:   return 3  # 元婴 6%
+	return 4                      # 化神 2%

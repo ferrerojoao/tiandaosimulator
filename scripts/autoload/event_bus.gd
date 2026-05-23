@@ -23,6 +23,7 @@ signal game_event_triggered(event_data: Dictionary)
 # UI 事件
 signal event_log_entry(text: String, category: String)
 signal camera_focus_requested(world_pos: Vector2)
+signal request_cultivator_detail(cultivator)
 
 # 天道干预事件
 signal tiandao_action(action_type: String, target, params: Dictionary)

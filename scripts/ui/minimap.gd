@@ -80,8 +80,8 @@ func _on_draw() -> void:
 	
 	# 修士
 	var realm_colors: Array[Color] = [
-		Color.WHITE, Color.LIGHT_BLUE, Color.CYAN,
-		Color.YELLOW, Color.ORANGE, Color.RED,
+		Color.LIGHT_BLUE, Color.CYAN, Color.YELLOW,
+		Color.ORANGE, Color.RED, Color.PURPLE,
 	]
 	var spawner = get_node_or_null("/root/main/CultivatorSpawner")
 	if spawner:

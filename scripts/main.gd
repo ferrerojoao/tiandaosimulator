@@ -3,9 +3,16 @@ extends Node2D
 
 var selected_cultivator: Node2D
 var selected_sect: Node2D
+var _detail_popup: Control
 
 func _ready() -> void:
 	print("[Main] 场景初始化完成")
+	var eb = get_node_or_null("/root/EventBus")
+	if eb:
+		eb.request_cultivator_detail.connect(_on_detail_request)
+
+func _on_detail_request(c: Node2D) -> void:
+	_show_detail_popup(c)
 
 func _input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton): return
@@ -22,7 +29,6 @@ func _input(event: InputEvent) -> void:
 		_right_click(world_pos, event.position)
 
 func _left_click(world_pos: Vector2) -> void:
-	_deselect_all()
 	var spawner = $CultivatorSpawner
 	if not spawner: return
 	
@@ -43,10 +49,17 @@ func _left_click(world_pos: Vector2) -> void:
 				best_cult_dist = d
 				best_cult = node
 	
+	# 双击修士：已选中同一人 → 弹出详情
+	var was_same: bool = selected_cultivator != null and selected_cultivator == best_cult
+	_deselect_all()
+	_close_detail_popup()
+	
 	if best_sect:
 		_select_sect(best_sect)
 	elif best_cult:
 		_select_cultivator(best_cult)
+		if was_same:
+			_show_detail_popup(best_cult)
 	else:
 		# 点到空地：显示灵气信息
 		var tx: int = int(world_pos.x / 32.0)
@@ -119,3 +132,74 @@ func _deselect_all() -> void:
 	selected_sect = null
 	if eb:
 		eb.sect_selected.emit(null)
+
+func _show_detail_popup(c: Node2D) -> void:
+	_close_detail_popup()
+	var ui = get_node_or_null("UI")
+	if not ui: return
+	
+	var panel = PanelContainer.new()
+	panel.name = "DetailPopup"
+	panel.custom_minimum_size = Vector2(380, 500)
+	panel.anchor_left = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -190
+	panel.offset_top = -250
+	panel.offset_right = 190
+	panel.offset_bottom = 250
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	
+	var vbox = VBoxContainer.new()
+	panel.add_child(vbox)
+	
+	vbox.add_child(_dl_label("▎%s" % c.get("cultivator_name")))
+	vbox.add_child(_dl_label("境界: %s" % c.get("REALM_NAMES")[c.get("realm")]))
+	var sr_names: Array = c.get("SPIRIT_ROOT_NAMES")
+	var e_names: Array = c.get("ELEMENT_NAMES")
+	vbox.add_child(_dl_label("灵根: %s(%s)" % [sr_names[c.get("spirit_root")], e_names[c.get("spirit_element")]]))
+	vbox.add_child(_dl_label("根骨: %d  悟性: %d  气运: %d" % [c.get("root_bone"), c.get("comprehension"), c.get("fortune")]))
+	vbox.add_child(_dl_label("宗门: %s  年龄: %d" % [c.get("sect") if c.get("sect") else "散修", c.get("age")]))
+	var ne: float = c.get("EXP_TO_NEXT")[c.get("realm")] if c.get("realm") < c.get("EXP_TO_NEXT").size() else -1
+	vbox.add_child(_dl_label("修为: %.0f / %.0f" % [c.get("cultivation_exp"), ne] if ne > 0 else "修为: %.0f (圆满)" % c.get("cultivation_exp")))
+	vbox.add_child(_dl_label("战绩: %d胜 %d败" % [c.get("wins"), c.get("losses")]))
+	
+	vbox.add_child(_dl_label("灵石: %d" % c.get("spirit_stones")))
+	var pills: Dictionary = c.get("pills")
+	var pl: String = ""
+	for k in pills: if pills[k] > 0: pl += "%s×%d " % [k, pills[k]]
+	vbox.add_child(_dl_label("丹药: %s" % (pl if pl else "无")))
+	
+	var specs: Dictionary = c.get("special_items")
+	var sl: String = ""
+	for k in specs: if specs[k] > 0: sl += "%s×%d " % [k, specs[k]]
+	vbox.add_child(_dl_label("特殊: %s" % (sl if sl else "无")))
+	
+	vbox.add_child(HSeparator.new())
+	vbox.add_child(_dl_label("生涯大事:"))
+	var events: Array = c.get("life_events")
+	var shown: int = mini(20, events.size())
+	for i in range(events.size() - shown, events.size()):
+		var evt: Dictionary = events[i]
+		vbox.add_child(_dl_label("[%d年] %s %s" % [evt["year"], evt["realm"], evt["text"]]))
+	
+	var btn = Button.new()
+	btn.text = "关闭"
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.pressed.connect(_close_detail_popup)
+	vbox.add_child(btn)
+	
+	ui.add_child(panel)
+	_detail_popup = panel
+
+func _dl_label(text: String) -> Label:
+	var l = Label.new()
+	l.text = text
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	return l
+
+func _close_detail_popup() -> void:
+	if _detail_popup and is_instance_valid(_detail_popup):
+		_detail_popup.queue_free()
+		_detail_popup = null
