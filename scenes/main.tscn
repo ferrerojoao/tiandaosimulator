@@ -1,0 +1,162 @@
+[gd_scene format=3 uid="uid://dv3q7a8xdtmvq"]
+
+[ext_resource type="Script" uid="uid://bo78sduyv8qkq" path="res://scripts/main.gd" id="1_o6xl0"]
+[ext_resource type="Script" uid="uid://vjocj7mtmqk3" path="res://scripts/ui/camera_controller.gd" id="2_tipki"]
+[ext_resource type="Script" uid="uid://yo4n7dltbf56" path="res://scripts/world/world_map.gd" id="3_85g3d"]
+[ext_resource type="Script" uid="uid://c3smi8p60wtoo" path="res://scripts/ui/top_bar.gd" id="4_choun"]
+[ext_resource type="Script" uid="uid://bkbmlvqnfuhh5" path="res://scripts/ui/time_control.gd" id="5_ya4ey"]
+[ext_resource type="Script" uid="uid://bvpshdc83uqmm" path="res://scripts/ui/event_log.gd" id="6_eb6dy"]
+[ext_resource type="Script" uid="uid://k5qps3lynj6k" path="res://scripts/ui/minimap.gd" id="7_trceg"]
+[ext_resource type="TileSet" uid="uid://d3rfpg0q3siuq" path="res://assets/tiles/terrain_tileset.tres" id="8_tileset"]
+[ext_resource type="Script" uid="uid://chj4cm5qacnak" path="res://scripts/world/cultivator_spawner.gd" id="9_spawn"]
+[ext_resource type="Script" path="res://scripts/ui/info_panel.gd" id="11_infop"]
+
+[node name="main" type="Node2D" unique_id=1177366983]
+script = ExtResource("1_o6xl0")
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1184541402]
+script = ExtResource("2_tipki")
+
+[node name="WorldMap" type="TileMap" parent="." unique_id=454452814]
+tile_set = ExtResource("8_tileset")
+format = 2
+script = ExtResource("3_85g3d")
+
+[node name="TileMapLayer" type="TileMapLayer" parent="WorldMap" unique_id=187716564]
+tile_set = ExtResource("8_tileset")
+
+[node name="CultivatorSpawner" type="Node" parent="." unique_id=999000001]
+script = ExtResource("9_spawn")
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=595050380]
+
+[node name="TopBar" type="PanelContainer" parent="UI" unique_id=566716230]
+offset_left = 10.0
+offset_top = 10.0
+offset_right = 10.0
+offset_bottom = 10.0
+script = ExtResource("4_choun")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UI/TopBar" unique_id=682204029]
+layout_mode = 2
+
+[node name="LabelYear" type="Label" parent="UI/TopBar/HBoxContainer" unique_id=1898466171]
+layout_mode = 2
+text = "Year"
+
+[node name="LabelSeason" type="Label" parent="UI/TopBar/HBoxContainer" unique_id=1642574845]
+layout_mode = 2
+
+[node name="LabelSpeed" type="Label" parent="UI/TopBar/HBoxContainer" unique_id=2114700564]
+layout_mode = 2
+
+[node name="LabelHeavenlyMechanism" type="Label" parent="UI/TopBar/HBoxContainer" unique_id=1573041272]
+layout_mode = 2
+
+[node name="TimeControl" type="PanelContainer" parent="UI" unique_id=1325983170]
+offset_left = 10.0
+offset_top = 45.0
+offset_right = 10.0
+offset_bottom = 45.0
+script = ExtResource("5_ya4ey")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UI/TimeControl" unique_id=333448656]
+layout_mode = 2
+
+[node name="BtnPause" type="Button" parent="UI/TimeControl/HBoxContainer" unique_id=196008598]
+layout_mode = 2
+text = "暂停"
+
+[node name="Btn1x" type="Button" parent="UI/TimeControl/HBoxContainer" unique_id=441683815]
+layout_mode = 2
+text = "1x"
+
+[node name="Btn2x" type="Button" parent="UI/TimeControl/HBoxContainer" unique_id=66941162]
+layout_mode = 2
+text = "2x"
+
+[node name="Btn5x" type="Button" parent="UI/TimeControl/HBoxContainer" unique_id=1829524375]
+layout_mode = 2
+text = "5x"
+
+[node name="Btn10x" type="Button" parent="UI/TimeControl/HBoxContainer" unique_id=400000001]
+layout_mode = 2
+text = "10x"
+
+[node name="EventLog" type="PanelContainer" parent="UI" unique_id=1160387529]
+custom_minimum_size = Vector2(280, 300)
+offset_left = 10.0
+offset_top = 80.0
+offset_right = 10.0
+offset_bottom = 80.0
+script = ExtResource("6_eb6dy")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/EventLog" unique_id=1044974591]
+layout_mode = 2
+
+[node name="HeaderBar" type="HBoxContainer" parent="UI/EventLog/VBoxContainer" unique_id=1658567584]
+layout_mode = 2
+
+[node name="LblTitle" type="Label" parent="UI/EventLog/VBoxContainer/HeaderBar" unique_id=1896984277]
+layout_mode = 2
+text = "事件日志"
+
+[node name="BtnToggle" type="Button" parent="UI/EventLog/VBoxContainer/HeaderBar" unique_id=1534128725]
+layout_mode = 2
+text = "收起"
+
+[node name="Scroll" type="ScrollContainer" parent="UI/EventLog/VBoxContainer" unique_id=1226231586]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="EntriesVBox" type="VBoxContainer" parent="UI/EventLog/VBoxContainer/Scroll" unique_id=1125400215]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_horizontal = 3
+
+[node name="Minimap" type="PanelContainer" parent="UI" unique_id=1334960480]
+custom_minimum_size = Vector2(200, 200)
+offset_left = 950.0
+offset_top = 10.0
+offset_right = 950.0
+offset_bottom = 10.0
+script = ExtResource("7_trceg")
+
+[node name="Overlay" type="Control" parent="UI/Minimap" unique_id=1352063695]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="LblTitle" type="Label" parent="UI/Minimap" unique_id=200000001]
+layout_mode = 2
+text = "小地图"
+
+[node name="CultivatorInfo" type="PanelContainer" parent="UI" unique_id=300000001]
+custom_minimum_size = Vector2(180, 140)
+offset_left = 950.0
+offset_top = 220.0
+offset_right = 950.0
+offset_bottom = 220.0
+script = ExtResource("11_infop")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="UI/CultivatorInfo" unique_id=300000002]
+layout_mode = 2
+
+[node name="LblName" type="Label" parent="UI/CultivatorInfo/VBoxContainer" unique_id=300000003]
+layout_mode = 2
+text = "名称"
+
+[node name="LblLine1" type="Label" parent="UI/CultivatorInfo/VBoxContainer" unique_id=300000004]
+layout_mode = 2
+text = "行1"
+
+[node name="LblLine2" type="Label" parent="UI/CultivatorInfo/VBoxContainer" unique_id=300000005]
+layout_mode = 2
+text = "行2"
+
+[node name="LblLine3" type="Label" parent="UI/CultivatorInfo/VBoxContainer" unique_id=300000006]
+layout_mode = 2
+text = "行3"
+
+[node name="LblLine4" type="Label" parent="UI/CultivatorInfo/VBoxContainer" unique_id=300000007]
+layout_mode = 2
+text = "行4"

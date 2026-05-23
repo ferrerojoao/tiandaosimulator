@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://cj7x42yrrrp3d"]
+
+[node name="test_hello" type="Node2D" unique_id=1779822068]
+
+[node name="RedBox" type="ColorRect" parent="." unique_id=221905741]
+offset_right = 400.0
+offset_bottom = 300.0
+color = Color(1, 0, 0, 1)
