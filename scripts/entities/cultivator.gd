@@ -41,10 +41,17 @@ var comprehension: int = 50 # 悟性 10-100
 var fortune: int = 50       # 气运 10-100
 
 # 物品
-var pills: Dictionary = {}   # {"筑基丹": 1, ...}
-var techniques: Array = []   # [{"name": "xxx", "grade": 0, "type": "cult"}]
-var special_items: Dictionary = {} # {"替死符": 1, "灵髓": 0, ...}
+var inventory: Dictionary = {}  # {"pill_qi": 3, "替死符": 1, ...}
+var techniques: Array = []      # [{"name": "xxx", "grade": 0, "type": "cult"}]
+static var _tech_cache: Dictionary = {}  # ID→数据
+static var _tech_loaded: bool = false
 var spirit_stones: int = 0
+var pill_used_breakthrough: bool = false
+var pill_qi_ticks: int = 0
+var pill_life_used: bool = false
+var life_bonus: int = 0
+var learn_book: String = ""  # 正在学的功法书名
+var learn_progress: float = 0.0  # 0~1
 
 # 战斗
 var combat_cooldown: float = 0.0
@@ -154,16 +161,39 @@ func get_cultivation_mult() -> float:
 			mult *= 1.5  # 同属性圣地 +50%
 	# 功法加成
 	for tech in techniques:
-		if tech["type"] == "cult":
+		if tech["type"] == 0:  # TechType.CULT
 			mult *= (1.0 + tech["grade"] * 0.15)
 	# 受伤减速
 	if injured_ticks > 0:
 		mult *= 0.3
+	# 培元丹
+	if pill_qi_ticks > 0:
+		mult *= 1.10
 	return mult
 
 func _on_tick(_year: int, _season: int) -> void:
 	if not alive: return
 	if realm >= Realm.TRIBULATION: return
+	
+	# === 丹药自动使用 ===
+	if injured_ticks > 0 and inventory.get("pill_heal", 0) > 0:
+		inventory["pill_heal"] -= 1
+		injured_ticks = maxi(0, injured_ticks - 5)
+		_add_event("服疗伤丹")
+	if pill_qi_ticks <= 0 and inventory.get("pill_qi", 0) > 0:
+		inventory["pill_qi"] -= 1
+		pill_qi_ticks = 10
+		_add_event("服培元丹")
+	if pill_qi_ticks > 0:
+		pill_qi_ticks -= 1
+	if not pill_life_used and inventory.get("pill_life", 0) > 0:
+		inventory["pill_life"] -= 1
+		pill_life_used = true
+		life_bonus += 50
+		_add_event("服延寿丹，寿元+50")
+	
+	_tick_learning()
+	
 	if injured_ticks > 0:
 		injured_ticks -= 1
 		# 在宗门/京城加速疗伤
@@ -229,27 +259,38 @@ func _finish_breakthrough() -> void:
 	
 	# 丹药加成
 	var pill_bonus: float = 0.0
-	match realm:
-		Realm.QI_REFINING:
-			if pills.get("筑基丹", 0) > 0:
-				success_chance = 1.0  # 100%
-				pills["筑基丹"] -= 1
-		Realm.FOUNDATION:
-			if pills.get("结丹丹", 0) > 0:
-				pill_bonus = 0.30
-				pills["结丹丹"] -= 1
-		Realm.GOLDEN_CORE:
-			if pills.get("婴变丹", 0) > 0:
-				pill_bonus = 0.15
-				pills["婴变丹"] -= 1
-		Realm.NASCENT_SOUL:
-			if pills.get("化神丹", 0) > 0:
-				pill_bonus = 0.05
-				pills["化神丹"] -= 1
-		Realm.DIVINE:
-			if pills.get("渡劫丹", 0) > 0:
-				pill_bonus = 0.05
-				pills["渡劫丹"] -= 1
+	if not pill_used_breakthrough:
+		match realm:
+			Realm.QI_REFINING:
+				if inventory.get("pill_build_foundation", 0) > 0:
+					inventory["pill_build_foundation"] -= 1
+					pill_used_breakthrough = true
+					_add_event("服筑基丹")
+					success_chance = 1.0
+			Realm.FOUNDATION:
+				if inventory.get("pill_form_core", 0) > 0:
+					inventory["pill_form_core"] -= 1
+					pill_bonus = 0.15
+					pill_used_breakthrough = true
+					_add_event("服结丹丹")
+			Realm.GOLDEN_CORE:
+				if inventory.get("pill_nascent", 0) > 0:
+					inventory["pill_nascent"] -= 1
+					pill_bonus = 0.07
+					pill_used_breakthrough = true
+					_add_event("服婴变丹")
+			Realm.NASCENT_SOUL:
+				if inventory.get("pill_divine", 0) > 0:
+					inventory["pill_divine"] -= 1
+					pill_bonus = 0.02
+					pill_used_breakthrough = true
+					_add_event("服化神丹")
+			Realm.DIVINE:
+				if inventory.get("pill_trib", 0) > 0:
+					inventory["pill_trib"] -= 1
+					pill_bonus = 0.02
+					pill_used_breakthrough = true
+					_add_event("服渡劫丹")
 	
 	success_chance = clampf(success_chance + pill_bonus, 0.05, 0.95)
 	
@@ -574,6 +615,56 @@ func get_combat_power() -> float:
 	base += rng.randf_range(-fortune / 5.0, fortune / 5.0)
 	return base
 
+func _tick_learning() -> void:
+	if not _tech_loaded:
+		var item_data = load("res://scripts/data/items.gd").new()
+		for t in item_data.TECHNIQUES:
+			_tech_cache[t["id"]] = t
+		item_data.queue_free()
+		_tech_loaded = true
+	
+	# 没在学 → 挑一本能学的书开始学
+	if learn_book == "":
+		for key in inventory:
+			if not key.begins_with("tech_"): continue
+			if inventory[key] <= 0: continue
+			var tech: Dictionary = _tech_cache.get(key, {})
+			if tech.is_empty(): continue
+			var g: int = tech.get("grade", 0)
+			if spirit_root < g: continue  # 灵根不足
+			# 检查是否已学会
+			var known: bool = false
+			for t in techniques:
+				if t.get("id") == key: known = true; break
+			if known: continue
+			# 开始学
+			learn_book = key
+			inventory[key] -= 1
+			if inventory[key] <= 0: inventory.erase(key)
+			learn_progress = 0.0
+			break
+		if learn_book == "": return
+	
+	var tech: Dictionary = _tech_cache.get(learn_book, {})
+	if tech.is_empty(): 
+		learn_book = ""; return
+	
+	var grade: int = tech.get("grade", 0)
+	if spirit_root < grade:
+		learn_book = ""; return  # 灵根变了，放弃
+	
+	# 悟性决定速度：每季 progress
+	var speed: float = comprehension / 800.0  # 100悟性→每季 0.125
+	speed /= (1.0 + grade * 0.5)  # 品级越高越慢
+	if randf() < fortune / 200.0: speed *= 2.0  # 气运偶尔悟道
+	learn_progress += speed
+	if learn_progress >= 1.0:
+		# 学成！功法书已消耗，获得功法
+		techniques.append(tech.duplicate())
+		_add_event("学会%s" % tech["name"])
+		learn_book = ""
+		learn_progress = 0.0
+
 func _check_combat() -> void:
 	if combat_cooldown > 0:
 		combat_cooldown -= 1
@@ -595,6 +686,13 @@ func _check_combat() -> void:
 		var ratio: float = (my_power - other_power) / maxf(my_power, 1.0)
 		if ratio > 0.5:
 			wins += 1
+			# 夺取随身物
+			var op: Dictionary = other.get("inventory")
+			if op:
+				for key in op:
+					if op[key] > 0:
+						inventory[key] = inventory.get(key, 0) + op[key]
+				_add_event("战利品")
 			other.die()
 			if eb:
 				eb.event_log_entry.emit("%s 斩杀 %s" % [cultivator_name, other.cultivator_name], "fight")
@@ -617,8 +715,8 @@ func _check_combat() -> void:
 
 func die() -> void:
 	# 替死符
-	if special_items.get("替死符", 0) > 0:
-		special_items["替死符"] -= 1
+	if inventory.get("替死符", 0) > 0:
+		inventory["替死符"] -= 1
 		injured_ticks = 5
 		var eb2 = get_node_or_null("/root/EventBus")
 		if eb2:

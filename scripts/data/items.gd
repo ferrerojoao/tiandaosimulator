@@ -5,13 +5,13 @@ extends Node
 
 # === 丹药 ===
 static var PILLS = [
-	{id="pill_qi", name="培元丹", grade=0, desc="加快修炼速度", effect="cult_speed", value=0.3, duration=10},
+	{id="pill_qi", name="培元丹", grade=0, desc="加快修炼速度", effect="cult_speed", value=0.10, duration=10},
 	{id="pill_build_foundation", name="筑基丹", realm_target=0, bonus=1.0, desc="炼气→筑基 100%成功率"},
-	{id="pill_form_core", name="结丹丹", realm_target=1, bonus=0.30, desc="筑基→金丹 +30%成功率"},
-	{id="pill_nascent", name="婴变丹", realm_target=2, bonus=0.15, desc="金丹→元婴 +15%成功率"},
-	{id="pill_divine", name="化神丹", realm_target=3, bonus=0.05, desc="元婴→化神 +5%成功率"},
-	{id="pill_trib", name="渡劫丹", realm_target=4, bonus=0.05, desc="化神→渡劫 +5%成功率"},
-	{id="pill_heal", name="疗伤丹", grade=0, desc="消除受伤状态", effect="cure_injury", value=1.0, duration=0},
+	{id="pill_form_core", name="结丹丹", realm_target=1, bonus=0.15, desc="筑基→金丹 +15%成功率"},
+	{id="pill_nascent", name="婴变丹", realm_target=2, bonus=0.07, desc="金丹→元婴 +7%成功率"},
+	{id="pill_divine", name="化神丹", realm_target=3, bonus=0.02, desc="元婴→化神 +2%成功率"},
+	{id="pill_trib", name="渡劫丹", realm_target=4, bonus=0.02, desc="化神→渡劫 +2%成功率"},
+	{id="pill_heal", name="疗伤丹", grade=0, desc="恢复部分伤势", effect="cure_injury", value=5, duration=0},
 	{id="pill_life", name="延寿丹", grade=2, desc="延长寿命 50 年", effect="extend_life", value=50, duration=0},
 ]
 

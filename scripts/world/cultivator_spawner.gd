@@ -3,6 +3,7 @@ extends Node
 
 const CULTIVATOR_SCENE: String = "res://scripts/entities/cultivator.gd"
 const SPAWN_COUNT: int = 20
+const TECH_POOL: Array[String] = ["tech_cult_mortal","tech_cult_yellow","tech_cult_mystic","tech_cult_earth","tech_cult_heaven","tech_combat_mortal","tech_combat_yellow","tech_combat_mystic","tech_combat_earth","tech_combat_heaven"]
 
 var _surnames: Array[String] = [
 	"李","王","张","刘","陈","杨","赵","黄","周","吴",
@@ -76,6 +77,17 @@ func _spawn_cultivators(wm: Node) -> void:
 		c.position = spawn_pos + offset
 		c.setup(_random_name(), _random_realm(), randi_range(18, 200))
 		c.set("is_newborn", true)
+		# 开局随机丹药 2~5 颗 + 功法书 0~2 本
+		var pool: Array = ["pill_qi","pill_qi","pill_qi","pill_build_foundation","pill_form_core","pill_nascent","pill_divine","pill_trib","pill_heal","pill_heal","pill_life"]
+		var bag: Dictionary = {}
+		for _j in randi_range(2, 5):
+			var pid: String = pool.pick_random()
+			bag[pid] = bag.get(pid, 0) + 1
+		# 随机功法书
+		for _j in randi_range(0, 2):
+			var tid: String = TECH_POOL.pick_random()
+			bag[tid] = bag.get(tid, 0) + 1
+		c.set("inventory", bag)
 		var target: String = queue[i]
 		if target != "":
 			c.set("newborn_target_sect", target)

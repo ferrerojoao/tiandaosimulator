@@ -103,10 +103,19 @@ func load_game() -> void:
 		c.fortune = cd["fortune"]
 		c.cultivation_exp = cd["cultivation_exp"]
 		c.sect = cd["sect"]
-		c.pills = cd["pills"]
+		c.inventory = cd.get("inventory", {})
+		if cd.has("pills"):
+			for k in cd["pills"]: c.inventory[k] = c.inventory.get(k, 0) + cd["pills"][k]
+		if cd.has("special_items"):
+			for k in cd["special_items"]: c.inventory[k] = c.inventory.get(k, 0) + cd["special_items"][k]
 		c.techniques = cd["techniques"]
 		c.spirit_stones = cd["spirit_stones"]
-		c.special_items = cd["special_items"]
+		c.pill_qi_ticks = cd.get("pill_qi_ticks", 0)
+		c.pill_used_breakthrough = cd.get("pill_used_breakthrough", false)
+		c.pill_life_used = cd.get("pill_life_used", false)
+		c.life_bonus = cd.get("life_bonus", 0)
+		c.learn_book = cd.get("learn_book", "")
+		c.learn_progress = cd.get("learn_progress", 0.0)
 		c.wins = cd["wins"]
 		c.losses = cd["losses"]
 		c.life_events = cd["life_events"]
@@ -247,8 +256,11 @@ func save_game() -> void:
 			"spirit_root": child.spirit_root, "spirit_element": child.spirit_element,
 			"root_bone": child.root_bone, "comprehension": child.comprehension, "fortune": child.fortune,
 			"cultivation_exp": child.cultivation_exp, "sect": child.sect,
-			"pills": child.pills, "techniques": child.techniques,
-			"spirit_stones": child.spirit_stones, "special_items": child.special_items,
+			"inventory": child.inventory, "techniques": child.techniques,
+			"spirit_stones": child.spirit_stones,
+			"pill_qi_ticks": child.pill_qi_ticks, "pill_used_breakthrough": child.pill_used_breakthrough,
+			"pill_life_used": child.pill_life_used, "life_bonus": child.life_bonus,
+		"learn_book": child.learn_book, "learn_progress": child.learn_progress,
 			"pos_x": child.position.x, "pos_y": child.position.y,
 			"wins": child.wins, "losses": child.losses, "life_events": child.life_events,
 			"is_breaking_through": child.is_breaking_through, "breakthrough_progress": child.breakthrough_progress,
@@ -294,12 +306,30 @@ func _show_detail_popup(c: Node2D) -> void:
 	vbox.add_child(_dl_label("修为: %.0f / %.0f" % [c.get("cultivation_exp"), ne] if ne > 0 else "修为: %.0f (圆满)" % c.get("cultivation_exp")))
 	vbox.add_child(_dl_label("战绩: %d胜 %d败" % [c.get("wins"), c.get("losses")]))
 	vbox.add_child(_dl_label("灵石: %d" % c.get("spirit_stones")))
-	var pills: Dictionary = c.get("pills"); var pl: String = ""
-	for k in pills: if pills[k] > 0: pl += "%s×%d " % [k, pills[k]]
-	vbox.add_child(_dl_label("丹药: %s" % (pl if pl else "无")))
-	var specs: Dictionary = c.get("special_items"); var sl: String = ""
-	for k in specs: if specs[k] > 0: sl += "%s×%d " % [k, specs[k]]
-	vbox.add_child(_dl_label("特殊: %s" % (sl if sl else "无")))
+	var pills: Dictionary = c.get("inventory"); var pl: String = ""
+	var pill_data = load("res://scripts/data/items.gd").new()
+	for k in pills:
+		if pills[k] > 0:
+			var name: String = k
+			for p in pill_data.PILLS:
+				if p["id"] == k: name = p["name"]; break
+			for t in pill_data.TECHNIQUES:
+				if t["id"] == k: name = "书·" + t["name"]; break
+			for s in pill_data.SPECIALS:
+				if s["id"] == k: name = s["name"]; break
+			pl += "%s×%d " % [name, pills[k]]
+	pill_data.queue_free()
+	vbox.add_child(_dl_label("随身: %s" % (pl if pl else "无")))
+	var tech_list: String = ""
+	for t in c.get("techniques"):
+		tech_list += "%s " % t["name"]
+	if c.get("learn_book") != "":
+		var lb: String = c.get("learn_book")
+		for t in pill_data.TECHNIQUES:
+			if t["id"] == lb: lb = t["name"]; break
+		tech_list += "[学%s:%.0f%%] " % [lb, c.get("learn_progress") * 100]
+	if tech_list != "":
+		vbox.add_child(_dl_label("功法: %s" % tech_list))
 	vbox.add_child(HSeparator.new())
 	vbox.add_child(_dl_label("生涯大事:"))
 	var events: Array = c.get("life_events")
