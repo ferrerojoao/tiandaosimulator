@@ -27,6 +27,7 @@ var spirit_element_map: Array = []
 var sacred_sites: Array = []  # [{pos: Vector2i, element: int, name: String}]
 var sect_positions: Array = []
 var village_positions: Array = []
+var capital_pos: Vector2i = Vector2i(-1, -1)
 var spirit_vein_positions: Array = []
 var height_map: Array = []
 
@@ -341,6 +342,21 @@ func _collect_spirit_veins() -> void:
 
 func _place_sects() -> void:
 	sect_positions.clear()
+	capital_pos = Vector2i(-1, -1)
+	
+	# 京城：地图中心附近，预留 30 格隔离区
+	var cx: int = MAP_WIDTH / 2 + _rng.randi_range(-5, 5)
+	var cy: int = MAP_HEIGHT / 2 + _rng.randi_range(-5, 5)
+	capital_pos = Vector2i(clampi(cx, 10, MAP_WIDTH - 11), clampi(cy, 10, MAP_HEIGHT - 11))
+	# 京城周围清出一片平地
+	for dy in [-3, -2, -1, 0, 1, 2, 3]:
+		for dx in [-3, -2, -1, 0, 1, 2, 3]:
+			var nx: int = capital_pos.x + dx
+			var ny: int = capital_pos.y + dy
+			if _in_bounds(Vector2i(nx, ny)):
+				terrain_map[ny][nx] = Terrain.PLAIN
+				spirit_density_map[ny][nx] = 0.7
+	
 	var water: Array = [Terrain.DEEP_WATER, Terrain.SHALLOW_WATER]
 	var attempts: int = 0
 	while sect_positions.size() < 6 and attempts < 2000:
@@ -350,6 +366,8 @@ func _place_sects() -> void:
 		var t: int = terrain_map[y][x]
 		if t in water or t == Terrain.HIGH_MOUNTAIN: continue
 		if not _far_enough(Vector2i(x, y), sect_positions, 30): continue
+		# 不要建在京城范围内
+		if Vector2i(x, y).distance_to(capital_pos) < 25: continue
 		sect_positions.append(Vector2i(x, y))
 		terrain_map[y][x] = Terrain.SECT_GROUND
 

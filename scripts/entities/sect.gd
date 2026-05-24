@@ -8,6 +8,7 @@ var power: int = 10
 var territory_radius: int = 15
 var color_index: int = 0
 var is_selected: bool = false
+var is_capital: bool = false
 
 var _sprite: Sprite2D
 
@@ -28,9 +29,15 @@ func _ready() -> void:
 	_sprite.centered = true
 	add_child(_sprite)
 
-func setup(p_idx: int, p_pos: Vector2) -> void:
-	sect_name = _sect_names[p_idx % _sect_names.size()]
-	color_index = p_idx % _sect_colors.size()
+func setup(p_idx: int, p_pos: Vector2, p_name: String = "", p_capital: bool = false) -> void:
+	if p_capital:
+		is_capital = true
+		sect_name = p_name
+		color_index = 6  # 京城固定 sect_6
+	else:
+		sect_name = _sect_names[p_idx % _sect_names.size()]
+		color_index = p_idx % _sect_colors.size()
+		if color_index >= 6: color_index = (p_idx + 1) % 6  # 跳过 6
 	position = p_pos
 	
 	if not _sprite:

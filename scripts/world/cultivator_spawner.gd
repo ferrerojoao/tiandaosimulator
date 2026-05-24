@@ -1,8 +1,8 @@
-## cultivator_spawner.gd - 修士生成器
+## cultivator_spawner.gd - 修士生成器（京城出生制）
 extends Node
 
 const CULTIVATOR_SCENE: String = "res://scripts/entities/cultivator.gd"
-const SPAWN_COUNT: int = 30
+const SPAWN_COUNT: int = 20
 
 var _surnames: Array[String] = [
 	"李","王","张","刘","陈","杨","赵","黄","周","吴",
@@ -15,7 +15,6 @@ var _given_names: Array[String] = [
 ]
 
 func _ready() -> void:
-	# 不再自动生成，由 main 菜单触发
 	pass
 
 func spawn_all() -> void:
@@ -38,39 +37,59 @@ func _on_world_generated() -> void:
 		_do_spawn(wm)
 
 func _do_spawn(wm: Node) -> void:
-	for i in SPAWN_COUNT:
-		var pos = _find_spawn_pos(wm)
-		if pos == null: continue
-		_spawn_cultivator(pos, i)
 	_spawn_sects(wm)
+	_spawn_capital(wm)
 	_spawn_sacred_sites(wm)
-	_assign_to_sects()
-	print("[Spawner] 生成完成：%d 修士, %d 宗门" % [SPAWN_COUNT, wm.sect_positions.size()])
+	_spawn_cultivators(wm)
 
-func _assign_to_sects() -> void:
-	# 收集所有宗门
+func _spawn_cultivators(wm: Node) -> void:
+	if wm.capital_pos.x < 0: return
+	
+	var spawn_pos: Vector2 = Vector2(wm.capital_pos.x * 32 + 16, wm.capital_pos.y * 32 + 16)
 	var sects: Array = []
 	for child in get_children():
-		if child.get("sect_name") != null:
-			sects.append(child)
-	if sects.is_empty(): return
+		if child.get("sect_name") != null and not child.get("is_capital"):
+			sects.append(child.get("sect_name"))
 	
-	# 为每个修士分配最近宗门
+	var rogue_count: int = 2
+	var per_sect: int = int(ceil(float(SPAWN_COUNT - rogue_count) / maxi(sects.size(), 1)))
+	
+	var queue: Array = []
+	for sn in sects:
+		for _i in per_sect:
+			queue.append(sn)
+	# 不足凑散修
+	while queue.size() < SPAWN_COUNT:
+		queue.append("")
+	# 保证 rogue 数
+	while queue.size() > SPAWN_COUNT:
+		queue.remove_at(0)
+	
+	queue.shuffle()
+	
+	for i in queue.size():
+		var c = Node2D.new()
+		c.set_script(load(CULTIVATOR_SCENE))
+		c.name = "Cultivator_%d" % i
+		# 京城周围随机偏移
+		var offset: Vector2 = Vector2(randf_range(-60, 60), randf_range(-60, 60))
+		c.position = spawn_pos + offset
+		c.setup(_random_name(), _random_realm(), randi_range(18, 200))
+		c.set("is_newborn", true)
+		var target: String = queue[i]
+		if target != "":
+			c.set("newborn_target_sect", target)
+		add_child(c)
+	
+	var sect_count: int = 0
+	var rogue: int = 0
 	for child in get_children():
 		if child.get("realm") == null: continue
-		var best_sect
-		var best_dist: float = INF
-		for s in sects:
-			var d: float = child.position.distance_squared_to(s.position)
-			if d < best_dist:
-				best_dist = d
-				best_sect = s
-		if best_sect:
-			child.set("sect", best_sect.get("sect_name"))
-			best_sect.set("member_count", best_sect.get("member_count") + 1)
-	
-	for s in sects:
-		print("[Spawner] %s: %d 名弟子" % [s.get("sect_name"), s.get("member_count")])
+		if child.get("newborn_target_sect") != "":
+			sect_count += 1
+		else:
+			rogue += 1
+	print("[Spawner] %d 新生儿: %d 入宗, %d 散修" % [queue.size(), sect_count, rogue])
 
 func _spawn_sects(wm: Node) -> void:
 	var sect_script = load("res://scripts/entities/sect.gd")
@@ -84,6 +103,17 @@ func _spawn_sects(wm: Node) -> void:
 		add_child(s)
 	print("[Spawner] 生成了 %d 个宗门" % wm.sect_positions.size())
 
+func _spawn_capital(wm: Node) -> void:
+	if wm.capital_pos.x < 0: return
+	var sect_script = load("res://scripts/entities/sect.gd")
+	var world_pos: Vector2 = Vector2(wm.capital_pos.x * 32 + 16, wm.capital_pos.y * 32 + 16)
+	var s = Node2D.new()
+	s.set_script(sect_script)
+	s.name = "Capital"
+	s.setup(0, world_pos, "京城", true)
+	add_child(s)
+	print("[Spawner] 京城: (%d, %d)" % [wm.capital_pos.x, wm.capital_pos.y])
+
 func _spawn_sacred_sites(wm: Node) -> void:
 	var ss_script = load("res://scripts/entities/sacred_site.gd")
 	for site in wm.sacred_sites:
@@ -95,30 +125,6 @@ func _spawn_sacred_sites(wm: Node) -> void:
 		s.setup(site["element"], site["name"], world_pos)
 		add_child(s)
 	print("[Spawner] 生成了 %d 个圣地" % wm.sacred_sites.size())
-
-func _find_spawn_pos(wm: Node) -> Variant:
-	var map_w: int = wm.terrain_map[0].size()
-	var map_h: int = wm.terrain_map.size()
-	for _attempt in 100:
-		var x: int = randi_range(10, map_w - 11)
-		var y: int = randi_range(10, map_h - 11)
-		var t: int = wm.terrain_map[y][x]
-		# 不在深海/高山生成
-		if t == 0 or t == 7: continue
-		return Vector2(x * 32 + 16, y * 32 + 16)
-	return null
-
-func _spawn_cultivator(pos: Vector2, index: int) -> void:
-	var c = Node2D.new()
-	c.set_script(load(CULTIVATOR_SCENE))
-	c.name = "Cultivator_%d" % index
-	c.position = pos
-	c.setup(
-		_random_name(),
-		_random_realm(),
-		randi_range(18, 200)
-	)
-	add_child(c)
 
 func _random_name() -> String:
 	return _surnames.pick_random() + _given_names.pick_random()

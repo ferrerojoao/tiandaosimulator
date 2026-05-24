@@ -305,8 +305,11 @@ func _show_detail_popup(c: Node2D) -> void:
 	var events: Array = c.get("life_events")
 	var shown: int = mini(20, events.size())
 	for i in range(events.size() - shown, events.size()):
-		var evt: Dictionary = events[i]
-		vbox.add_child(_dl_label("[%d年] %s %s" % [evt["year"], evt["realm"], evt["text"]]))
+		var evt = events[i]
+		if evt is Dictionary:
+			vbox.add_child(_dl_label("[%d年] %s %s" % [evt["year"], evt.get("realm", ""), evt["text"]]))
+		else:
+			vbox.add_child(_dl_label(str(evt)))
 	var btn = Button.new(); btn.text = "关闭"; btn.pressed.connect(_close_detail_popup); vbox.add_child(btn)
 	ui.add_child(panel)
 	_detail_popup = panel

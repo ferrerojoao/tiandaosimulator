@@ -60,6 +60,8 @@ var is_breaking_through: bool = false
 var breakthrough_progress: float = 0.0
 var injured_ticks: int = 0
 var ai_goal: String = "游历"
+var is_newborn: bool = false
+var newborn_target_sect: String = ""
 
 # 生涯大事
 var life_events: Array = []  # [{year, text}]
@@ -164,6 +166,9 @@ func _on_tick(_year: int, _season: int) -> void:
 	if realm >= Realm.TRIBULATION: return
 	if injured_ticks > 0:
 		injured_ticks -= 1
+		# 在宗门/京城加速疗伤
+		if _is_at_capital() or _is_at_sect():
+			injured_ticks = maxi(0, injured_ticks - 1)
 	
 	var speed_mult: float = 1.0
 	if blessed_ticks > 0:
@@ -285,11 +290,54 @@ func _process(delta: float) -> void:
 	if not alive: return
 	delta *= GameTime.speed_multipliers.get(GameTime.current_speed, 1.0)
 	if is_breaking_through: return  # 闭关中不移动
+	if is_newborn:
+		_newborn_ai(delta)
+		return
 	wander_cooldown -= delta
 	if wander_cooldown <= 0.0:
 		_decide_behavior()
 	if position.distance_to(wander_target) > 4.0:
 		position = position.move_toward(wander_target, move_speed * delta)
+
+func _newborn_ai(delta: float) -> void:
+	if newborn_target_sect != "":
+		ai_goal = "前往" + newborn_target_sect
+		var sp = _find_sect_by_name(newborn_target_sect)
+		if sp:
+			if position.distance_to(sp) < 48.0:
+				# 到达宗门，入籍
+				sect = newborn_target_sect
+				is_newborn = false
+				ai_goal = "游历"
+				life_events.append({"year": GameTime.current_year, "text": "加入" + sect, "realm": REALM_NAMES[realm]})
+				# 更新宗门人数
+				var sn = _find_sect_node_by_name(sect)
+				if sn:
+					var mc: int = sn.get("member_count")
+					sn.set("member_count", mc + 1)
+				return
+			position = position.move_toward(sp, move_speed * 2.0 * delta)
+		return
+	# 散修：京城附近转几圈
+	var cp = _find_capital_pos()
+	if cp:
+		ai_goal = "新生游历"
+		if position.distance_to(cp) < 120.0:
+			# 近处随机走
+			wander_cooldown -= delta
+			if wander_cooldown <= 0.0:
+				wander_target = cp + Vector2(randf_range(-100, 100), randf_range(-100, 100))
+				wander_target.x = clampf(wander_target.x, 16, 12784)
+				wander_target.y = clampf(wander_target.y, 16, 12784)
+				wander_cooldown = randf_range(1.0, 3.0)
+			if position.distance_to(wander_target) > 4.0:
+				position = position.move_toward(wander_target, move_speed * delta)
+		else:
+			position = position.move_toward(cp, move_speed * delta)
+	# 几个季度后自动去掉新生标记
+	if GameTime.current_season >= 2:
+		is_newborn = false
+		ai_goal = "游历"
 
 func _decide_behavior() -> void:
 	# 1. 逃命
@@ -316,14 +364,22 @@ func _decide_behavior() -> void:
 			wander_cooldown = randf_range(2.0, 4.0)
 			return
 	
-	# 4. 回宗
-	if injured_ticks > 0 and sect != "":
-		ai_goal = "回宗养伤"
-		var sect_pos = _find_sect_pos()
-		if sect_pos:
-			wander_target = sect_pos
-			wander_cooldown = randf_range(3.0, 5.0)
-			return
+	# 4. 回宗/京城
+	if injured_ticks > 0:
+		if sect != "":
+			ai_goal = "回宗养伤"
+			var sect_pos = _find_sect_pos()
+			if sect_pos:
+				wander_target = sect_pos
+				wander_cooldown = randf_range(3.0, 5.0)
+				return
+		else:
+			ai_goal = "前往京城"
+			var cap_pos = _find_capital_pos()
+			if cap_pos:
+				wander_target = cap_pos
+				wander_cooldown = randf_range(3.0, 5.0)
+				return
 	
 	# 5. 寻灵
 	if cultivation_exp < EXP_TO_NEXT[realm]:
@@ -406,6 +462,38 @@ func _find_sect_pos():
 			return node.position
 	return null
 
+func _find_sect_node_by_name(sn: String):
+	var spawner = get_parent()
+	if not spawner: return null
+	for node in spawner.get_children():
+		if node.get("sect_name") == sn:
+			return node
+	return null
+
+func _find_sect_by_name(sn: String):
+	var spawner = get_parent()
+	if not spawner: return null
+	for node in spawner.get_children():
+		if node.get("sect_name") == sn:
+			return node.position
+	return null
+
+func _find_capital_pos():
+	var spawner = get_parent()
+	if not spawner: return null
+	for node in spawner.get_children():
+		if node.get("is_capital"):
+			return node.position
+	return null
+
+func _is_at_capital() -> bool:
+	var cp = _find_capital_pos()
+	return cp != null and position.distance_to(cp) < 80.0
+
+func _is_at_sect() -> bool:
+	var sp = _find_sect_pos()
+	return sp != null and position.distance_to(sp) < 80.0
+
 func _find_high_spirit():
 	var wm = get_node_or_null("/root/main/WorldMap")
 	if not wm: return null
@@ -471,6 +559,7 @@ func _check_combat() -> void:
 		if not other.get("alive"): continue
 		if position.distance_to(other.position) > 60: continue
 		if sect != "" and sect == other.get("sect"): continue  # 同宗不战
+		if is_newborn or other.get("is_newborn"): continue  # 新生儿互不攻击
 		var my_power: float = get_combat_power()
 		var other_power: float = other.get_combat_power()
 		if my_power <= other_power: continue  # 我方弱，不主动出手
