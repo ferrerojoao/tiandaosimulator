@@ -61,6 +61,8 @@ func _on_tick(_year: int, season: int) -> void:
 			bag[pid] = bag.get(pid, 0) + 1
 		c.set("inventory", bag)
 		c.set("spirit_stones", randi_range(2, 8))
+		c.set("personality", randi() % 3)
+		c.set("talent", randi() % 9)
 		# 新生儿基本都入宗
 		if sects.size() > 0 and randf() < 0.85:
 			c.set("newborn_target_sect", sects.pick_random())
@@ -144,6 +146,8 @@ func _spawn_cultivators(wm: Node) -> void:
 			bag[cid] = bag.get(cid, 0) + 1
 		c.set("inventory", bag)
 		c.set("spirit_stones", randi_range(5, 20))
+		c.set("personality", randi() % 3)  # 随机性格
+		c.set("talent", randi() % 9)        # 随机天赋
 		var target: String = queue[i]
 		if target != "":
 			c.set("newborn_target_sect", target)

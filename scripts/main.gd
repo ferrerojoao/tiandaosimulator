@@ -114,8 +114,11 @@ func load_game() -> void:
 		c.pill_used_breakthrough = cd.get("pill_used_breakthrough", false)
 		c.pill_life_used = cd.get("pill_life_used", false)
 		c.life_bonus = cd.get("life_bonus", 0)
-		c.learn_book = cd.get("learn_book", "")
-		c.learn_progress = cd.get("learn_progress", 0.0)
+	c.learn_book = cd.get("learn_book", "")
+	c.learn_progress = cd.get("learn_progress", 0.0)
+	c.relations = cd.get("relations", {})
+	c.personality = cd.get("personality", 1)  # 默认稳健
+	c.talent = cd.get("talent", 0)  # 默认天慧
 		c.wins = cd["wins"]
 		c.losses = cd["losses"]
 		c.life_events = cd["life_events"]
@@ -304,6 +307,8 @@ func save_game() -> void:
 			"pill_qi_ticks": child.pill_qi_ticks, "pill_used_breakthrough": child.pill_used_breakthrough,
 			"pill_life_used": child.pill_life_used, "life_bonus": child.life_bonus,
 		"learn_book": child.learn_book, "learn_progress": child.learn_progress,
+		"relations": child.relations,
+		"personality": child.personality, "talent": child.talent,
 			"pos_x": child.position.x, "pos_y": child.position.y,
 			"wins": child.wins, "losses": child.losses, "life_events": child.life_events,
 			"is_breaking_through": child.is_breaking_through, "breakthrough_progress": child.breakthrough_progress,
@@ -344,6 +349,9 @@ func _show_detail_popup(c: Node2D) -> void:
 	var e_names: Array = c.get("ELEMENT_NAMES")
 	vbox.add_child(_dl_label("灵根: %s(%s)" % [sr_names[c.get("spirit_root")], e_names[c.get("spirit_element")]]))
 	vbox.add_child(_dl_label("根骨: %d  悟性: %d  气运: %d" % [c.get("root_bone"), c.get("comprehension"), c.get("fortune")]))
+	var pn: Array = c.get("PERSONALITY_NAMES")
+	var tn: Array = c.get("TALENT_NAMES")
+	vbox.add_child(_dl_label("性格: %s  天赋: %s" % [pn[c.get("personality")], tn[c.get("talent")]]))
 	vbox.add_child(_dl_label("宗门: %s  年龄: %d" % [c.get("sect") if c.get("sect") else "散修", c.get("age")]))
 	var ne: float = c.get("EXP_TO_NEXT")[c.get("realm")] if c.get("realm") < c.get("EXP_TO_NEXT").size() else -1
 	vbox.add_child(_dl_label("修为: %.0f / %.0f" % [c.get("cultivation_exp"), ne] if ne > 0 else "修为: %.0f (圆满)" % c.get("cultivation_exp")))

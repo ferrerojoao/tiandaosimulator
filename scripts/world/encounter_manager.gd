@@ -210,17 +210,19 @@ func _get_wm() -> Node:
 	_world_map = get_node_or_null("/root/main/WorldMap")
 	return _world_map
 
-func check_nearby(world_pos: Vector2) -> Dictionary:
-	"""返回最近的可用奇遇点，无则返回空"""
+func check_nearby_range(world_pos: Vector2, dist: int = 1) -> Dictionary:
 	var tx: int = int(world_pos.x / 32.0)
 	var ty: int = int(world_pos.y / 32.0)
 	for enc in encounters:
 		if enc["occupied"] != "": continue
 		var dx: int = abs(tx - enc["grid_x"])
 		var dy: int = abs(ty - enc["grid_y"])
-		if dx <= 1 and dy <= 1:
+		if dx <= dist and dy <= dist:
 			return enc
 	return {}
+
+func check_nearby(world_pos: Vector2) -> Dictionary:
+	return check_nearby_range(world_pos, 1)
 
 func try_enter(cultivator: Node, enc: Dictionary) -> bool:
 	"""多人竞争：先到先得 + 同季 roll 点"""

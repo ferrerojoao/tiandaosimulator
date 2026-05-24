@@ -4,6 +4,12 @@ extends Node2D
 enum Realm { QI_REFINING, FOUNDATION, GOLDEN_CORE, NASCENT_SOUL, DIVINE, TRIBULATION }
 enum SpiritRoot { TURBID=0, CLEAR=1, MYSTIC=2, HEAVENLY=3 }
 enum Element { NONE=0, METAL=1, WOOD=2, WATER=3, FIRE=4, EARTH=5 }
+enum Personality { AGGRESSIVE=0, STEADY=1, PEACEFUL=2 }
+enum Talent { SKY_WISDOM=0, TENACIOUS=1, GREEDY=2, EXPLORER=3, ALCHEMIST=4, SLAYER=5, LONER=6, CAUTIOUS=7, WAR_GOD=8 }
+
+const PERSONALITY_NAMES: Array[String] = ["嗜杀", "稳健", "平和"]
+const PERSONALITY_FIGHT_CHANCE: Array[float] = [0.80, 0.50, 0.20]
+const TALENT_NAMES: Array[String] = ["天慧", "坚韧", "贪婪", "探奇", "丹道", "杀伐", "孤僻", "谨慎", "战神"]
 
 const REALM_NAMES: Array[String] = ["炼气", "筑基", "金丹", "元婴", "化神", "渡劫"]
 const REALM_COLORS: Array[Color] = [
@@ -59,6 +65,9 @@ var learn_progress: float = 0.0  # 0~1
 var is_in_encounter: bool = false
 var encounter_timer: int = 0
 var guided: bool = false
+var relations: Dictionary = {}  # { "对方名字": 数值 }
+var personality: int = Personality.STEADY
+var talent: int = Talent.SKY_WISDOM
 
 # 战斗
 var combat_cooldown: float = 0.0
@@ -190,10 +199,20 @@ func _on_tick(_year: int, _season: int) -> void:
 	# === 灵石兑换 ===
 	_try_exchange()
 	
+	# === 同宗关系自然增长 ===
+	if sect != "":
+		var spawner = get_parent()
+		if spawner:
+			for other in spawner.get_children():
+				if other == self: continue
+				if other.get("sect") == sect:
+					_mod_relation(other, 0.5)
+	
 	# === 丹药自动使用 ===
 	if injured_ticks > 0 and inventory.get("pill_heal", 0) > 0:
 		inventory["pill_heal"] -= 1
-		injured_ticks = maxi(0, injured_ticks - 5)
+		var heal_amt: int = 7 if talent == Talent.ALCHEMIST else 5
+		injured_ticks = maxi(0, injured_ticks - heal_amt)
 		_add_event("服疗伤丹")
 	if pill_qi_ticks <= 0 and inventory.get("pill_qi", 0) > 0:
 		inventory["pill_qi"] -= 1
@@ -218,8 +237,9 @@ func _on_tick(_year: int, _season: int) -> void:
 	
 	if injured_ticks > 0:
 		injured_ticks -= 1
-		# 在宗门/京城加速疗伤
 		if _is_at_capital() or _is_at_sect():
+			injured_ticks = maxi(0, injured_ticks - 1)
+		if talent == Talent.TENACIOUS:
 			injured_ticks = maxi(0, injured_ticks - 1)
 	
 	var speed_mult: float = 1.0
@@ -559,7 +579,17 @@ func _can_breakthrough_now() -> bool:
 	# 检查特殊物品
 	var item_id: String = BREAK_ITEMS.get(realm, "")
 	if item_id != "" and inventory.get(item_id, 0) <= 0: return false
-	return true
+	# 谨慎天赋：必须有对应丹药才突破
+	if talent == Talent.CAUTIOUS and not pill_used_breakthrough:
+		# 检查是否有对应丹药
+		var has_pill: bool = false
+		match realm:
+			Realm.QI_REFINING: has_pill = inventory.get("pill_build_foundation", 0) > 0
+			Realm.FOUNDATION: has_pill = inventory.get("pill_form_core", 0) > 0
+			Realm.GOLDEN_CORE: has_pill = inventory.get("pill_nascent", 0) > 0
+			Realm.NASCENT_SOUL: has_pill = inventory.get("pill_divine", 0) > 0
+			Realm.DIVINE: has_pill = inventory.get("pill_trib", 0) > 0
+		if not has_pill: return false
 	return true
 
 func _find_nearby_threat():
@@ -611,10 +641,11 @@ func _find_breakthrough_prep_target():
 	return null
 
 func _try_go_encounter() -> bool:
-	if is_newborn: return false  # 新生儿不受奇遇干扰
+	if is_newborn: return false
 	var em = get_node_or_null("/root/EncounterManager")
 	if not em: return false
-	var enc: Dictionary = em.check_nearby(position)
+	var dist: int = 2 if talent == Talent.EXPLORER else 1
+	var enc: Dictionary = em.check_nearby_range(position, dist)
 	if enc.is_empty(): return false
 	if not em.try_enter(self, enc): return false
 	wander_target = Vector2(enc["grid_x"] * 32 + 16, enc["grid_y"] * 32 + 16)
@@ -730,6 +761,17 @@ func curse(ticks: int) -> void:
 	cursed_ticks += ticks
 	queue_redraw()
 
+# --- 关系 ---
+func _get_relation(other: Node) -> float:
+	return relations.get(other.get("cultivator_name"), 0.0)
+
+func _mod_relation(other: Node, delta: float) -> void:
+	var name: String = other.get("cultivator_name")
+	var cur: float = relations.get(name, 0.0)
+	if talent == Talent.SLAYER: delta *= 2.0
+	if talent == Talent.LONER: delta *= 0.5
+	relations[name] = clampf(cur + delta, -100.0, 100.0)
+
 func get_combat_power() -> float:
 	# 战力 = 境界×30 + 根骨×0.3 + 战斗功法×10 ± 气运/5
 	var base: float = (realm + 1) * 30.0
@@ -748,7 +790,13 @@ func get_combat_power() -> float:
 		base *= 0.4
 	elif injured_ticks > 0:
 		base *= 0.7
+	if talent == Talent.WAR_GOD: base *= 1.25
 	return base
+
+func perceive_combat_power() -> float:
+	"""外人看到的战力：±15% 误差"""
+	var real: float = get_combat_power()
+	return real * randf_range(0.85, 1.15)
 
 func _tick_learning() -> void:
 	if not _tech_loaded:
@@ -792,6 +840,7 @@ func _tick_learning() -> void:
 	var speed: float = comprehension / 800.0  # 100悟性→每季 0.125
 	speed /= (1.0 + grade * 0.5)  # 品级越高越慢
 	if randf() < fortune / 200.0: speed *= 2.0  # 气运偶尔悟道
+	if talent == Talent.SKY_WISDOM: speed *= 2.0
 	learn_progress += speed
 	if learn_progress >= 1.0:
 		# 学成！功法书已消耗，获得功法
@@ -807,7 +856,7 @@ func _try_exchange() -> void:
 	if _is_at_capital(): near_shop = true
 	if sect != "" and _is_at_sect(): near_shop = true
 	if not near_shop: return
-	if randf() > 0.3: return  # 30%概率尝试购买
+	if randf() > (0.4 if talent == Talent.GREEDY else 0.3): return
 	
 	# 随机挑一件可买物品
 	var items_data = load("res://scripts/data/items.gd")
@@ -846,80 +895,132 @@ func _check_combat() -> void:
 	if _inside_capital(): return
 	var spawner = get_parent()
 	if not spawner: return
-	for other in spawner.get_children():
-		if other == self: continue
-		if other.get("realm") == null: continue
-		if not other.get("alive"): continue
+	var eb = get_node_or_null("/root/EventBus")
+	
+	var all_cults: Array = []
+	for child in spawner.get_children():
+		if child == self: continue
+		if child.get("realm") == null: continue
+		if not child.get("alive"): continue
+		if child.get("is_newborn") or is_newborn: continue
+		if child.get("is_in_encounter") or is_in_encounter: continue
+		all_cults.append(child)
+	
+	# 优先找仇人（关系 ≤ -30）
+	var target: Node = null
+	for other in all_cults:
 		if position.distance_to(other.position) > 60: continue
-		if sect != "" and sect == other.get("sect"): continue  # 同宗不战
-		if is_newborn or other.get("is_newborn"): continue  # 新生儿互不攻击
-		if is_in_encounter or other.get("is_in_encounter"): continue  # 奇遇中不战
-		guided = false  # 进战斗即取消指引
-		other.set("guided", false)
-		var my_power: float = get_combat_power()
-		var other_power: float = other.get_combat_power()
-		var eb = get_node_or_null("/root/EventBus")
-		
-		# === 战斗物品 ===
-		var use_fatal: bool = false
-		var use_fire: bool = false
-		if my_power > other_power:
-			# 进攻方使用战斗物品
-			if inventory.get("cb_fire", 0) > 0:
-				inventory["cb_fire"] -= 1
-				my_power += 40
-				use_fire = true
-			if inventory.get("cb_fatal", 0) > 0:
-				inventory["cb_fatal"] -= 1
-				use_fatal = true
-		
-		if my_power <= other_power:
-			# 弱方：尝试逃跑
-			if inventory.get("cb_escape", 0) > 0:
-				inventory["cb_escape"] -= 1
-				if eb: eb.event_log_entry.emit("%s 使用疾风符逃脱 %s" % [cultivator_name, other.cultivator_name], "fight")
-				continue
-			continue  # 弱方不主动出手
-		var ratio: float = (my_power - other_power) / maxf(my_power, 1.0)
-		if use_fatal: ratio *= 1.5
-		if use_fire:
-			_add_event("用爆炎符")
-		if ratio > 0.5:
-			wins += 1
-			# 夺取随身物（战斗物品已打坏，不掠夺）
-			var op: Dictionary = other.get("inventory")
+		if sect != "" and sect == other.get("sect"): continue
+		if _get_relation(other) <= -30:
+			target = other
+			break
+	# 没仇人找弱者（贵重物品更诱人，战力有迷雾）
+	if not target:
+		var best_score: float = 999.0
+		for other in all_cults:
+			if position.distance_to(other.position) > 60: continue
+			if sect != "" and sect == other.get("sect"): continue
+			var r: float = other.perceive_combat_power() / maxf(perceive_combat_power(), 1.0)
+			# 贵重物品加重攻击倾向
+			var loot_score: float = 0.0
+			var inv: Dictionary = other.get("inventory", {})
+			for key in inv:
+				if key.begins_with("spec_"): loot_score += 0.5
+				elif key.begins_with("tech_cult_earth") or key.begins_with("tech_combat_earth"): loot_score += 0.3
+				elif key.begins_with("tech_cult_heaven") or key.begins_with("tech_combat_heaven"): loot_score += 0.4
+			loot_score += other.get("spirit_stones", 0) * 0.002
+			r -= loot_score  # 越诱人 r 越小，越优先打
+			if r < best_score:
+				best_score = r
+				target = other
+	if not target: return  # 没可打的
+	if perceive_combat_power() <= target.perceive_combat_power() and inventory.get("cb_escape", 0) <= 0:
+		return  # 打不过且无疾风符
+	
+	# 性格影响动手概率
+	if randf() > PERSONALITY_FIGHT_CHANCE[personality]:
+		return
+	
+	# === 组建阵营 ===
+	var side_a: Array = [self]  # 我方
+	var side_b: Array = [target]  # 敌方
+	for other in all_cults:
+		if other == target: continue
+		if position.distance_to(target.position) > 80: continue
+		if other.get("injured_ticks", 0) > 10: continue  # 重伤不能帮忙
+		# 对方对我的看法
+		var their_rel_to_me: float = other.get("relations", {}).get(cultivator_name, 0.0)
+		var their_rel_to_target: float = other.get("relations", {}).get(target.cultivator_name, 0.0)
+		if their_rel_to_me >= 40 and their_rel_to_target < 40:
+			side_a.append(other)
+		elif their_rel_to_target >= 40 and their_rel_to_me < 40:
+			side_b.append(other)
+	
+	# 全员取消指引
+	for c in side_a: c.set("guided", false)
+	for c in side_b: c.set("guided", false)
+	
+	# 战力汇总
+	var power_a: float = 0.0
+	var power_b: float = 0.0
+	for c in side_a:
+		power_a += c.get_combat_power()
+		# 战斗物品
+		if c.get("inventory").get("cb_fire", 0) > 0:
+			c.get("inventory")["cb_fire"] -= 1; power_a += 40
+		if c.get("inventory").get("cb_fatal", 0) > 0:
+			c.get("inventory")["cb_fatal"] -= 1; power_a *= 1.2
+	for c in side_b:
+		power_b += c.get_combat_power()
+		if c.get("inventory").get("cb_fire", 0) > 0:
+			c.get("inventory")["cb_fire"] -= 1; power_b += 40
+	
+	if power_a <= power_b and inventory.get("cb_escape", 0) <= 0:
+		return  # 打不过
+	
+	var ratio: float = (power_a - power_b) / maxf(power_a, 1.0)
+	
+	if ratio > 0.5:
+		# 斩杀
+		for c in side_b:
+			var op: Dictionary = c.get("inventory")
 			if op:
 				for key in op:
 					if key.begins_with("cb_"): continue
 					if op[key] > 0:
 						inventory[key] = inventory.get(key, 0) + op[key]
-				_add_event("战利品")
-			other.die()
-			if eb:
-				eb.event_log_entry.emit("%s 斩杀 %s" % [cultivator_name, other.cultivator_name], "fight")
-		elif ratio > 0.2:
-			wins += 1
-			# 对方检查金刚符
-			var oinv: Dictionary = other.get("inventory")
-			if oinv.get("cb_shield", 0) > 0:
-				oinv["cb_shield"] -= 1
-				other.set("injured_ticks", 8)
-				if eb: eb.event_log_entry.emit("%s 重伤 %s，金刚符护体降为击退" % [cultivator_name, other.cultivator_name], "fight")
-			else:
-				other.set("losses", other.get("losses") + 1)
-				other.set("injured_ticks", 40)
-				other.combat_cooldown = 10.0
-				if eb:
-					eb.event_log_entry.emit("%s 重伤 %s，后者逃走" % [cultivator_name, other.cultivator_name], "fight")
-		else:
-			wins += 1
-			other.set("losses", other.get("losses") + 1)
-			other.set("injured_ticks", 8)
-			other.combat_cooldown = 8.0
-			if eb:
-				eb.event_log_entry.emit("%s 击退 %s" % [cultivator_name, other.cultivator_name], "fight")
-		combat_cooldown = 5.0
-		return
+			c.die()
+			_mod_relation(c, -25)
+		for c in side_a:
+			if c != self:
+				c._mod_relation(target, -15)
+		if eb: eb.event_log_entry.emit("%s一方 %d人 斩杀 %s一方 %d人" % [cultivator_name, side_a.size(), target.cultivator_name, side_b.size()], "fight")
+	elif ratio > 0.2:
+		# 重伤
+		for c in side_b:
+			c.set("losses", c.get("losses") + 1)
+			c.set("injured_ticks", 40)
+			c.combat_cooldown = 10.0
+			_mod_relation(c, -20)
+		if eb: eb.event_log_entry.emit("%s一方 重伤 %s一方" % [cultivator_name, target.cultivator_name], "fight")
+	else:
+		# 击退
+		for c in side_b:
+			c.set("losses", c.get("losses") + 1)
+			c.set("injured_ticks", 8)
+			c.combat_cooldown = 8.0
+			_mod_relation(c, -20)
+		if eb: eb.event_log_entry.emit("%s一方 击退 %s一方" % [cultivator_name, target.cultivator_name], "fight")
+	
+	# 战友加好感
+	for c in side_a:
+		if c != self:
+			_mod_relation(c, 5.0)
+	
+	combat_cooldown = 5.0
+	for c in side_a:
+		if c != self:
+			c.combat_cooldown = 5.0
 
 func die() -> void:
 	# 替死符
