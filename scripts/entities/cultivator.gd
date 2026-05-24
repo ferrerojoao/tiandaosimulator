@@ -417,6 +417,21 @@ func _process(delta: float) -> void:
 		position = position.move_toward(position + push * 50.0, move_speed * 3.0 * delta)
 		return
 	
+	# 同宗避让（游历/寻灵/购物时避免叠一起）
+	if sect != "" and not guided and ai_goal in ["游历", "寻灵修炼", "回宗采购", "前往京城采购", "筹备突破"]:
+		var avoid: Vector2 = Vector2.ZERO
+		var spawner = get_parent()
+		if spawner:
+			for other in spawner.get_children():
+				if other == self: continue
+				if other.get("sect") != sect: continue
+				var d: float = position.distance_to(other.position)
+				if d < 20 and d > 0.1:
+					avoid += (position - other.position).normalized() / d * 40.0
+		if avoid.length() > 0.1:
+			position = position.move_toward(position + avoid.normalized() * 40.0, move_speed * 2.0 * delta)
+			return
+	
 	wander_cooldown -= delta
 	if wander_cooldown <= 0.0:
 		_decide_behavior()
