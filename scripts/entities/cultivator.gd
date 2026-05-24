@@ -283,6 +283,7 @@ func _finish_breakthrough() -> void:
 
 func _process(delta: float) -> void:
 	if not alive: return
+	delta *= GameTime.speed_multipliers.get(GameTime.current_speed, 1.0)
 	if is_breaking_through: return  # 闭关中不移动
 	wander_cooldown -= delta
 	if wander_cooldown <= 0.0:
