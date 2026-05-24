@@ -54,10 +54,11 @@ func _ready() -> void:
 	var cl = CanvasLayer.new()
 	cl.layer = 100
 	add_child(cl)
+	# 顶栏高度约30px，放在下方
 	_ui_label = Label.new()
-	_ui_label.position = Vector2(10, 70)
-	_ui_label.add_theme_font_size_override("font_size", 14)
-	_ui_label.add_theme_color_override("font_color", Color.WHITE)
+	_ui_label.position = Vector2(10, 32)
+	_ui_label.add_theme_font_size_override("font_size", 12)
+	_ui_label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.3, 1.0))
 	cl.add_child(_ui_label)
 	connect_tick()
 
@@ -186,6 +187,24 @@ func _roll_quality() -> int:
 	if r < 0.95: return Quality.PRECIOUS
 	return Quality.LEGEND
 
+func spawn_legendary(gx: int, gy: int) -> void:
+	var wm = _get_wm()
+	if not wm: return
+	var sp: Sprite2D = Sprite2D.new()
+	sp.position = Vector2(gx * 32 + 16, gy * 32 + 16)
+	var circle = _create_glow_circle(Quality.LEGEND)
+	sp.texture = circle
+	sp.centered = true
+	wm.add_child(sp)
+	encounters.append({
+		"pos": Vector2i(gx, gy),
+		"grid_x": gx, "grid_y": gy,
+		"quality": Quality.LEGEND,
+		"timer": DURATION,
+		"occupied": "",
+		"_sprite": sp,
+	})
+
 func _get_wm() -> Node:
 	if _world_map: return _world_map
 	_world_map = get_node_or_null("/root/main/WorldMap")
@@ -206,7 +225,7 @@ func check_nearby(world_pos: Vector2) -> Dictionary:
 func try_enter(cultivator: Node, enc: Dictionary) -> bool:
 	"""多人竞争：先到先得 + 同季 roll 点"""
 	if enc["occupied"] != "":
-		var other = get_node_or_null(enc["occupied"])
+		var other = get_node_or_null(NodePath(enc["occupied"]))
 		if other and is_instance_valid(other):
 			# roll 点竞争
 			if randi() % 100 > randi() % 100:
@@ -215,7 +234,7 @@ func try_enter(cultivator: Node, enc: Dictionary) -> bool:
 				other.set("ai_goal", "游历")
 			else:
 				return false
-	enc["occupied"] = cultivator.get_path()
+	enc["occupied"] = str(cultivator.get_path())
 	cultivator.set("is_in_encounter", true)
 	cultivator.set("encounter_timer", ENCOUNTER_LENGTH)
 	cultivator.set("ai_goal", "奇遇中")
@@ -223,7 +242,7 @@ func try_enter(cultivator: Node, enc: Dictionary) -> bool:
 
 func finish_encounter(cultivator: Node) -> void:
 	for enc in encounters:
-		if enc["occupied"] == cultivator.get_path():
+		if enc["occupied"] == str(cultivator.get_path()):
 			_give_reward(cultivator, enc)
 			var sp = enc.get("_sprite")
 			if sp: sp.queue_free()

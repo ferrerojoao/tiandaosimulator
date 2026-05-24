@@ -163,29 +163,72 @@ func _left_click(world_pos: Vector2) -> void:
 			eb.tile_selected.emit(int(world_pos.x / 32.0), int(world_pos.y / 32.0))
 
 func _right_click(world_pos: Vector2, screen_pos: Vector2) -> void:
-	if not selected_cultivator or not is_instance_valid(selected_cultivator): return
-	var c = selected_cultivator
+	var tile_x: int = int(world_pos.x / 32.0)
+	var tile_y: int = int(world_pos.y / 32.0)
 	var popup = PopupMenu.new()
-	popup.name = "CultMenu"
-	popup.add_item("祝福 (20 天道值)", 0)
-	popup.add_item("诅咒 (10 天道值)", 1)
-	popup.position = screen_pos
-	popup.id_pressed.connect(func(id: int):
-		match id:
-			0:
-				var gt = get_node_or_null("/root/GameTime")
-				var eb = get_node_or_null("/root/EventBus")
-				if gt and gt.spend_hm(20):
-					c.call("bless", 30)
-					if eb: eb.event_log_entry.emit("%s 获得天道祝福" % c.get("cultivator_name"), "hm")
-				elif eb: eb.event_log_entry.emit("天道值不足 (需要 20)", "hm")
-			1:
-				var gt = get_node_or_null("/root/GameTime")
-				var eb = get_node_or_null("/root/EventBus")
-				if gt and gt.spend_hm(10):
-					c.call("curse", 20)
-					if eb: eb.event_log_entry.emit("%s 被天道诅咒" % c.get("cultivator_name"), "hm")
-	)
+	
+	# 判断是否点在修士身上
+	var clicked_cult: bool = false
+	if selected_cultivator and is_instance_valid(selected_cultivator):
+		var dist: float = world_pos.distance_to(selected_cultivator.position)
+		clicked_cult = dist < 40  # 点在修士附近
+	
+	if clicked_cult:
+		var c = selected_cultivator
+		popup.add_item("赐福 (20 天道值)", 0)
+		popup.add_item("诅咒 (30 天道值)", 1)
+		popup.position = screen_pos
+		popup.id_pressed.connect(func(id: int):
+			var gt = get_node_or_null("/root/GameTime")
+			var eb = get_node_or_null("/root/EventBus")
+			match id:
+				0:
+					if gt and gt.spend_hm(20):
+						c.bless(20)
+						if eb: eb.event_log_entry.emit("%s 获得天道赐福" % c.cultivator_name, "hm")
+					elif eb: eb.event_log_entry.emit("天道值不足 (需要 20)", "hm")
+				1:
+					if gt and gt.spend_hm(30):
+						c.curse(10)
+						if eb: eb.event_log_entry.emit("%s 被天道诅咒" % c.cultivator_name, "hm")
+					elif eb: eb.event_log_entry.emit("天道值不足 (需要 30)", "hm")
+		)
+	else:
+		popup.add_item("灵潮 (30 天道值)", 0)
+		popup.add_item("秘境 (60 天道值)", 1)
+		if selected_cultivator and is_instance_valid(selected_cultivator):
+			popup.add_item("指引修士至此 (15 天道值)", 2)
+		popup.position = screen_pos
+		popup.id_pressed.connect(func(id: int):
+			var gt = get_node_or_null("/root/GameTime")
+			var eb = get_node_or_null("/root/EventBus")
+			match id:
+				0:
+					if gt and gt.spend_hm(30):
+						var wm = get_node_or_null("/root/main/WorldMap")
+						if wm:
+							wm.spirit_boosts.append({"x": tile_x, "y": tile_y, "radius": 8, "multiplier": 2.0, "ticks": 20})
+							if eb: eb.event_log_entry.emit("灵潮爆发于(%d,%d)" % [tile_x, tile_y], "hm")
+					elif eb: eb.event_log_entry.emit("天道值不足 (需要 30)", "hm")
+				1:
+					if gt and gt.spend_hm(60):
+						var em = get_node_or_null("/root/EncounterManager")
+						if em: em.spawn_legendary(tile_x, tile_y)
+						if eb: eb.event_log_entry.emit("秘境现世于(%d,%d)！" % [tile_x, tile_y], "hm")
+					elif eb: eb.event_log_entry.emit("天道值不足 (需要 60)", "hm")
+				2:
+					if gt and gt.spend_hm(15):
+						var c = selected_cultivator
+						if c.get("is_newborn"): 
+							if eb: eb.event_log_entry.emit("新生修士不受天道指引", "hm")
+							return
+						c.set("wander_target", Vector2(tile_x * 32 + 16, tile_y * 32 + 16))
+						c.set("wander_cooldown", 99.0)
+						c.set("guided", true)
+						c.set("ai_goal", "天道指引")
+						if eb: eb.event_log_entry.emit("天道指引 %s 前往(%d,%d)" % [c.cultivator_name, tile_x, tile_y], "hm")
+					elif eb: eb.event_log_entry.emit("天道值不足 (需要 15)", "hm")
+		)
 	add_child(popup)
 	popup.popup()
 

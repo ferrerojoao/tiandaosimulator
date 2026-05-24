@@ -58,6 +58,7 @@ var learn_book: String = ""  # 正在学的功法书名
 var learn_progress: float = 0.0  # 0~1
 var is_in_encounter: bool = false
 var encounter_timer: int = 0
+var guided: bool = false
 
 # 战斗
 var combat_cooldown: float = 0.0
@@ -401,6 +402,11 @@ func _process(delta: float) -> void:
 		_decide_behavior()
 	if position.distance_to(wander_target) > 4.0:
 		position = position.move_toward(wander_target, move_speed * delta)
+	elif guided:
+		# 指引到达，恢复自主行动
+		guided = false
+		wander_cooldown = 0.0
+		ai_goal = "游历"
 
 func _newborn_ai(delta: float) -> void:
 	if newborn_target_sect != "":
@@ -819,7 +825,7 @@ func _check_combat() -> void:
 	if combat_cooldown > 0:
 		combat_cooldown -= 1
 		return
-	if _inside_capital(): return  # 京城内禁止攻击
+	if _inside_capital(): return
 	var spawner = get_parent()
 	if not spawner: return
 	for other in spawner.get_children():
@@ -830,6 +836,8 @@ func _check_combat() -> void:
 		if sect != "" and sect == other.get("sect"): continue  # 同宗不战
 		if is_newborn or other.get("is_newborn"): continue  # 新生儿互不攻击
 		if is_in_encounter or other.get("is_in_encounter"): continue  # 奇遇中不战
+		guided = false  # 进战斗即取消指引
+		other.set("guided", false)
 		var my_power: float = get_combat_power()
 		var other_power: float = other.get_combat_power()
 		var eb = get_node_or_null("/root/EventBus")

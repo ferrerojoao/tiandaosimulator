@@ -30,6 +30,7 @@ var village_positions: Array = []
 var capital_pos: Vector2i = Vector2i(-1, -1)
 var spirit_vein_positions: Array = []
 var height_map: Array = []
+var spirit_boosts: Array = []  # [{x, y, radius, multiplier, ticks}]
 
 var _noise_continent: FastNoiseLite
 
@@ -43,7 +44,16 @@ var _world_generated: bool = false
 func _ready() -> void:
 	_rng.randomize()
 	_init_noise()
+	var gt = get_node_or_null("/root/GameTime")
+	if gt and gt.has_signal("tick_advanced"):
+		gt.tick_advanced.connect(_on_tick)
 	# generate_world() 由 main 菜单触发
+
+func _on_tick(_year: int, _season: int) -> void:
+	for i in range(spirit_boosts.size() - 1, -1, -1):
+		spirit_boosts[i]["ticks"] -= 1
+		if spirit_boosts[i]["ticks"] <= 0:
+			spirit_boosts.remove_at(i)
 
 func _init_noise() -> void:
 	_noise_continent = FastNoiseLite.new()
@@ -431,7 +441,12 @@ func get_spirit_density(tile_x: int, tile_y: int) -> float:
 	if spirit_density_map.is_empty(): return 0.0
 	if tile_y < 0 or tile_y >= spirit_density_map.size(): return 0.0
 	if tile_x < 0 or tile_x >= spirit_density_map[tile_y].size(): return 0.0
-	return spirit_density_map[tile_y][tile_x]
+	var base: float = spirit_density_map[tile_y][tile_x]
+	for boost in spirit_boosts:
+		var dist: float = sqrt((tile_x - boost["x"]) ** 2 + (tile_y - boost["y"]) ** 2)
+		if dist <= boost["radius"]:
+			base *= boost["multiplier"]
+	return base
 
 func get_spirit_element(tile_x: int, tile_y: int) -> int:
 	if spirit_element_map.is_empty(): return Element.NONE
