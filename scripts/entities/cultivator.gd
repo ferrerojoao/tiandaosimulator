@@ -66,29 +66,42 @@ var life_events: Array = []  # [{year, text}]
 
 static var _icon_textures: Array[Texture2D] = []
 
+var _sprite: Sprite2D
+
 var wander_target: Vector2
 var wander_cooldown: float = 0.0
 var move_speed: float = 60.0
 
 func _ready() -> void:
 	if _icon_textures.is_empty():
-		for i in 6:
-			_icon_textures.append(load("res://assets/tiles/cultivator_%d.png" % i))
+		for i in 16:
+			var path = "res://assets/tiles/cultivator_%d.png" % i
+			if FileAccess.file_exists(path.replace("res://", "")):
+				_icon_textures.append(load(path))
+			else:
+				break
+	_sprite = Sprite2D.new()
+	_sprite.centered = true
+	add_child(_sprite)
 	_connect_time()
-	queue_redraw()
+	_update_icon()
+
+func _update_icon() -> void:
+	if not _sprite:
+		_sprite = Sprite2D.new()
+		_sprite.centered = true
+		add_child(_sprite)
+	if realm < _icon_textures.size():
+		_sprite.texture = _icon_textures[realm]
 
 func _draw() -> void:
 	if not alive: return
 	if is_selected:
-		draw_circle(Vector2.ZERO, 20, Color.GOLD, false, 2)
+		draw_circle(Vector2.ZERO, 72, Color.GOLD, false, 2)
 	if blessed_ticks > 0:
-		draw_circle(Vector2.ZERO, 18, Color.GOLD, false, 1)
+		draw_circle(Vector2.ZERO, 68, Color.GOLD, false, 1)
 	if cursed_ticks > 0:
-		draw_circle(Vector2.ZERO, 18, Color.RED, false, 1)
-	if realm < _icon_textures.size() and _icon_textures[realm]:
-		draw_texture(_icon_textures[realm], Vector2(-16, -16))
-	else:
-		draw_circle(Vector2.ZERO, 8, REALM_COLORS[realm])
+		draw_circle(Vector2.ZERO, 68, Color.RED, false, 1)
 		draw_circle(Vector2.ZERO, 9, Color.BLACK, false, 2)
 
 func setup(p_name: String, p_realm: int, p_age: int) -> void:
@@ -97,6 +110,7 @@ func setup(p_name: String, p_realm: int, p_age: int) -> void:
 	age = p_age
 	_generate_attributes()
 	cultivation_exp = randf_range(0, EXP_TO_NEXT[realm] * 0.3) if EXP_TO_NEXT[realm] > 0 else 3000.0
+	_update_icon()
 	_pick_wander_target()
 
 func _generate_attributes() -> void:
@@ -325,8 +339,8 @@ func _decide_behavior() -> void:
 		var sect_pos = _find_sect_pos()
 		if sect_pos:
 			wander_target = sect_pos + Vector2(randf_range(-80, 80), randf_range(-80, 80))
-			wander_target.x = clampf(wander_target.x, 16, 6384)
-			wander_target.y = clampf(wander_target.y, 16, 6384)
+			wander_target.x = clampf(wander_target.x, 16, 12784)
+			wander_target.y = clampf(wander_target.y, 16, 12784)
 			wander_cooldown = randf_range(3.0, 6.0)
 			return
 	
@@ -360,8 +374,8 @@ func _flee_from(threat) -> void:
 	if dir.length() < 1: dir = Vector2(randf_range(-1, 1), randf_range(-1, 1))
 	dir = dir.normalized()
 	wander_target = position + dir * 200.0
-	wander_target.x = clampf(wander_target.x, 16, 6384)
-	wander_target.y = clampf(wander_target.y, 16, 6384)
+	wander_target.x = clampf(wander_target.x, 16, 12784)
+	wander_target.y = clampf(wander_target.y, 16, 12784)
 	wander_cooldown = randf_range(1.0, 2.0)
 
 func _find_breakthrough_prep_target():
@@ -412,8 +426,8 @@ func _find_high_spirit():
 
 func _pick_wander_target() -> void:
 	wander_target = position + Vector2(randf_range(-200, 200), randf_range(-200, 200))
-	wander_target.x = clampf(wander_target.x, 16, 6384)
-	wander_target.y = clampf(wander_target.y, 16, 6384)
+	wander_target.x = clampf(wander_target.x, 16, 12784)
+	wander_target.y = clampf(wander_target.y, 16, 12784)
 	wander_cooldown = randf_range(2.0, 6.0)
 
 func get_display_name() -> String:

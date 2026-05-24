@@ -3,8 +3,8 @@ extends TileMap
 
 @onready var tilemap: TileMapLayer = $TileMapLayer
 
-const MAP_WIDTH: int = 200
-const MAP_HEIGHT: int = 200
+const MAP_WIDTH: int = 400
+const MAP_HEIGHT: int = 400
 const TILE_SIZE: int = 32
 
 enum Terrain {

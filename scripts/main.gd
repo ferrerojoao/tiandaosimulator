@@ -131,7 +131,7 @@ func _left_click(world_pos: Vector2) -> void:
 	var best_sect: Node2D
 	var best_sect_dist: float = 40.0
 	var best_cult: Node2D
-	var best_cult_dist: float = 32.0
+	var best_cult_dist: float = 64.0
 	for node in spawner.get_children():
 		if not node.has_method("get_display_name"): continue
 		var d: float = world_pos.distance_to(node.position)
