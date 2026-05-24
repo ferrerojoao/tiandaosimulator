@@ -187,6 +187,9 @@ func _deselect_all() -> void:
 	selected_cultivator = null
 	var eb = get_node_or_null("/root/EventBus")
 	if eb: eb.cultivator_selected.emit(null)
+	if selected_sect and is_instance_valid(selected_sect):
+		if selected_sect.has_method("set_selected"):
+			selected_sect.set_selected(false)
 	selected_sect = null
 	if eb: eb.sect_selected.emit(null)
 
@@ -202,9 +205,9 @@ func _select_cultivator(c: Node2D) -> void:
 
 func _select_sect(s: Node2D) -> void:
 	selected_sect = s
-	if s.has_method("set_selected"): s.set_selected(true)
+	s.set_selected(true)
 	if selected_cultivator:
-		if selected_cultivator.has_method("set_selected"): selected_cultivator.set_selected(false)
+		selected_cultivator.set_selected(false)
 	selected_cultivator = null
 	var eb = get_node_or_null("/root/EventBus")
 	if eb: eb.sect_selected.emit(s)
