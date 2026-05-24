@@ -21,6 +21,10 @@ const LIFESPAN: Array[int] = [150, 300, 800, 2000, 5000, 9999]
 # 突破所需灵气阈值
 const BREAK_SPIRIT: Array[float] = [0.0, 0.3, 0.5, 0.7, 1.0, 1.0]
 const BREAK_DURATION: Array[int] = [3, 5, 8, 12, 20, 50]
+const BREAK_ITEMS: Dictionary = {
+	Realm.NASCENT_SOUL: "spec_spirit_marrow",  # 元婴→化神 需灵髓
+	Realm.DIVINE: "spec_boundary_stone",        # 化神→渡劫 需破界石
+}
 
 # 基础属性
 var cultivator_name: String
@@ -165,7 +169,7 @@ func get_cultivation_mult() -> float:
 			mult *= (1.0 + tech["grade"] * 0.15)
 	# 受伤减速
 	if injured_ticks > 0:
-		mult *= 0.3
+		mult *= 0.1
 	# 培元丹
 	if pill_qi_ticks > 0:
 		mult *= 1.10
@@ -245,9 +249,28 @@ func _attempt_breakthrough() -> void:
 			if wm.get_spirit_density(tx, ty) < required:
 				return  # 灵气不足，继续等
 	
+	# 高境界必须在同属性圣地
+	if realm >= Realm.NASCENT_SOUL:
+		var wm = get_node_or_null("/root/main/WorldMap")
+		if wm:
+			var tx: int = int(position.x / 32.0)
+			var ty: int = int(position.y / 32.0)
+			if wm.get_spirit_element(tx, ty) != spirit_element or wm.get_spirit_density(tx, ty) < 0.9:
+				return  # 不在同属性圣地
+	
+	# 高境界需要特殊物品
+	var item_id: String = BREAK_ITEMS.get(realm, "")
+	if item_id != "" and inventory.get(item_id, 0) <= 0:
+		ai_goal = "寻求" + item_id
+		return  # 缺必备物品
+	
 	is_breaking_through = true
 	breakthrough_progress = 0.0
 	cultivation_exp = EXP_TO_NEXT[realm]  # 锁定满值
+	# 消耗特殊物品
+	if item_id != "":
+		inventory[item_id] -= 1
+		if inventory[item_id] <= 0: inventory.erase(item_id)
 	ai_goal = "闭关中"
 	var eb = get_node_or_null("/root/EventBus")
 	if eb:
@@ -331,12 +354,12 @@ func _finish_breakthrough() -> void:
 			Realm.FOUNDATION:
 				pass  # 只掉修为
 			Realm.GOLDEN_CORE:
-				injured_ticks = 5
+				injured_ticks = 15
 			Realm.NASCENT_SOUL:
-				injured_ticks = 10
+				injured_ticks = 30
 				if randf() < 0.2: die(); return
 			Realm.DIVINE:
-				injured_ticks = 15
+				injured_ticks = 60
 				if randf() < 0.5: die(); return
 		if eb:
 			eb.event_log_entry.emit("%s 突破 %s 失败" % [cultivator_name, REALM_NAMES[realm + 1]], "cult")
@@ -411,23 +434,7 @@ func _decide_behavior() -> void:
 			_flee_from(danger)
 			return
 	
-	# 2. 闭关
-	if _can_breakthrough_now():
-		ai_goal = "准备闭关"
-		_attempt_breakthrough()
-		wander_cooldown = 99.0
-		return
-	
-	# 3. 筹备
-	if cultivation_exp >= EXP_TO_NEXT[realm]:
-		ai_goal = "筹备突破"
-		var target = _find_breakthrough_prep_target()
-		if target:
-			wander_target = target
-			wander_cooldown = randf_range(2.0, 4.0)
-			return
-	
-	# 4. 回宗/京城
+	# 2. 疗伤（先治再突破）
 	if injured_ticks > 0:
 		if sect != "":
 			ai_goal = "回宗养伤"
@@ -444,7 +451,31 @@ func _decide_behavior() -> void:
 				wander_cooldown = randf_range(3.0, 5.0)
 				return
 	
-	# 5. 寻灵
+	# 3. 闭关
+	if _can_breakthrough_now():
+		ai_goal = "准备闭关"
+		_attempt_breakthrough()
+		wander_cooldown = 99.0
+		return
+	
+	# 4. 缺必备物品（高境界突破需要灵髓/破界石，只能奇遇获取）
+	if cultivation_exp >= EXP_TO_NEXT[realm]:
+		var item_id: String = BREAK_ITEMS.get(realm, "")
+		if item_id != "" and inventory.get(item_id, 0) <= 0:
+			ai_goal = "寻求" + item_id
+			_pick_wander_target()
+			return
+	
+	# 5. 筹备
+	if cultivation_exp >= EXP_TO_NEXT[realm]:
+		ai_goal = "筹备突破"
+		var target = _find_breakthrough_prep_target()
+		if target:
+			wander_target = target
+			wander_cooldown = randf_range(2.0, 4.0)
+			return
+	
+	# 6. 寻灵
 	if cultivation_exp < EXP_TO_NEXT[realm]:
 		ai_goal = "寻灵修炼"
 		var spirit_target = _find_high_spirit()
@@ -453,7 +484,7 @@ func _decide_behavior() -> void:
 			wander_cooldown = randf_range(2.0, 4.0)
 			return
 	
-	# 6. 游历
+	# 7. 游历
 	ai_goal = "游历"
 	if sect != "" and randf() < 0.6:
 		var sect_pos = _find_sect_pos()
@@ -475,6 +506,14 @@ func _can_breakthrough_now() -> bool:
 	var tx: int = int(position.x / 32.0)
 	var ty: int = int(position.y / 32.0)
 	if wm.get_spirit_density(tx, ty) < required: return false
+	# 高境界需在同属性圣地
+	if realm >= Realm.NASCENT_SOUL:
+		if wm.get_spirit_element(tx, ty) != spirit_element or wm.get_spirit_density(tx, ty) < 0.9:
+			return false
+	# 检查特殊物品
+	var item_id: String = BREAK_ITEMS.get(realm, "")
+	if item_id != "" and inventory.get(item_id, 0) <= 0: return false
+	return true
 	return true
 
 func _find_nearby_threat():
@@ -637,6 +676,13 @@ func get_combat_power() -> float:
 	var rng = RandomNumberGenerator.new()
 	rng.seed = randi()
 	base += rng.randf_range(-fortune / 5.0, fortune / 5.0)
+	# 受伤惩罚
+	if injured_ticks > 25:
+		base *= 0.15
+	elif injured_ticks > 10:
+		base *= 0.4
+	elif injured_ticks > 0:
+		base *= 0.7
 	return base
 
 func _tick_learning() -> void:
@@ -789,18 +835,18 @@ func _check_combat() -> void:
 			var oinv: Dictionary = other.get("inventory")
 			if oinv.get("cb_shield", 0) > 0:
 				oinv["cb_shield"] -= 1
-				other.set("injured_ticks", 3)
+				other.set("injured_ticks", 8)
 				if eb: eb.event_log_entry.emit("%s 重伤 %s，金刚符护体降为击退" % [cultivator_name, other.cultivator_name], "fight")
 			else:
 				other.set("losses", other.get("losses") + 1)
-				other.set("injured_ticks", 10)
+				other.set("injured_ticks", 40)
 				other.combat_cooldown = 10.0
 				if eb:
 					eb.event_log_entry.emit("%s 重伤 %s，后者逃走" % [cultivator_name, other.cultivator_name], "fight")
 		else:
 			wins += 1
 			other.set("losses", other.get("losses") + 1)
-			other.set("injured_ticks", 3)
+			other.set("injured_ticks", 8)
 			other.combat_cooldown = 8.0
 			if eb:
 				eb.event_log_entry.emit("%s 击退 %s" % [cultivator_name, other.cultivator_name], "fight")
@@ -811,7 +857,7 @@ func die() -> void:
 	# 替死符
 	if inventory.get("替死符", 0) > 0:
 		inventory["替死符"] -= 1
-		injured_ticks = 5
+		injured_ticks = 15
 		var eb2 = get_node_or_null("/root/EventBus")
 		if eb2:
 			eb2.event_log_entry.emit("%s 消耗替死符躲过死劫" % cultivator_name, "item")
