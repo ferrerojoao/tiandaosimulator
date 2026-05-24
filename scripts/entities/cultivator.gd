@@ -541,15 +541,23 @@ func _find_breakthrough_prep_target():
 	var wm = get_node_or_null("/root/main/WorldMap")
 	if not wm: return null
 	var required: float = BREAK_SPIRIT[realm]
-	# 走向灵气最高的区域
+	var map_w: int = wm.MAP_WIDTH if wm.get("MAP_WIDTH") else 400
+	var map_h: int = wm.MAP_HEIGHT if wm.get("MAP_HEIGHT") else 400
+	var need_sacred: bool = realm >= Realm.NASCENT_SOUL
+	
 	var best_score: float = -1.0
 	var best_pos: Vector2
-	for _try in 30:
-		var x: int = randi_range(0, 199)
-		var y: int = randi_range(0, 199)
+	for _try in 50:
+		var x: int = randi_range(1, map_w - 2)
+		var y: int = randi_range(1, map_h - 2)
 		var d: float = wm.get_spirit_density(x, y)
+		var e: int = wm.get_spirit_element(x, y)
 		var dist: float = position.distance_to(Vector2(x * 32, y * 32))
-		var score: float = d - dist / 6400.0
+		# 高境界优先同属性圣地
+		var score: float = d - dist / 12800.0
+		if need_sacred:
+			if e != spirit_element or d < 0.9: continue  # 非同属性圣地跳过
+			score = 1000.0 - dist  # 直奔最近同属性圣地
 		if score > best_score:
 			best_score = score
 			best_pos = Vector2(x * 32 + 16, y * 32 + 16)
