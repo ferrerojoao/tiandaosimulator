@@ -567,14 +567,18 @@ func _find_high_spirit():
 	if not wm: return null
 	var best_d: float = -1.0
 	var best_pos: Vector2
+	var map_w: int = wm.MAP_WIDTH if wm.get("MAP_WIDTH") else 400
+	var map_h: int = wm.MAP_HEIGHT if wm.get("MAP_HEIGHT") else 400
 	for _try in 20:
-		var ox: float = randf_range(-50, 50)
-		var oy: float = randf_range(-50, 50)
+		var ox: float = randf_range(-80, 80)
+		var oy: float = randf_range(-80, 80)
 		var tx: int = int((position.x + ox) / 32.0)
 		var ty: int = int((position.y + oy) / 32.0)
-		tx = clampi(tx, 0, 199)
-		ty = clampi(ty, 0, 199)
+		tx = clampi(tx, 1, map_w - 2)
+		ty = clampi(ty, 1, map_h - 2)
 		var d: float = wm.get_spirit_density(tx, ty)
+		# 未受伤时避开零灵气区（京城）
+		if d <= 0.01 and injured_ticks <= 0: continue
 		if d > best_d:
 			best_d = d
 			best_pos = Vector2(tx * 32 + 16, ty * 32 + 16)
@@ -582,9 +586,15 @@ func _find_high_spirit():
 	return null
 
 func _pick_wander_target() -> void:
-	wander_target = position + Vector2(randf_range(-200, 200), randf_range(-200, 200))
-	wander_target.x = clampf(wander_target.x, 16, 12784)
-	wander_target.y = clampf(wander_target.y, 16, 12784)
+	for _try in 10:
+		wander_target = position + Vector2(randf_range(-200, 200), randf_range(-200, 200))
+		wander_target.x = clampf(wander_target.x, 16, 12784)
+		wander_target.y = clampf(wander_target.y, 16, 12784)
+		# 未受伤时避开京城零灵气区
+		if injured_ticks > 0: break
+		var cp = _find_capital_pos()
+		if cp and wander_target.distance_to(cp) < 480: continue
+		break
 	wander_cooldown = randf_range(2.0, 6.0)
 
 func get_display_name() -> String:
@@ -681,15 +691,39 @@ func _check_combat() -> void:
 		if is_newborn or other.get("is_newborn"): continue  # 新生儿互不攻击
 		var my_power: float = get_combat_power()
 		var other_power: float = other.get_combat_power()
-		if my_power <= other_power: continue  # 我方弱，不主动出手
 		var eb = get_node_or_null("/root/EventBus")
+		
+		# === 战斗物品 ===
+		var use_fatal: bool = false
+		var use_fire: bool = false
+		if my_power > other_power:
+			# 进攻方使用战斗物品
+			if inventory.get("cb_fire", 0) > 0:
+				inventory["cb_fire"] -= 1
+				my_power += 40
+				use_fire = true
+			if inventory.get("cb_fatal", 0) > 0:
+				inventory["cb_fatal"] -= 1
+				use_fatal = true
+		
+		if my_power <= other_power:
+			# 弱方：尝试逃跑
+			if inventory.get("cb_escape", 0) > 0:
+				inventory["cb_escape"] -= 1
+				if eb: eb.event_log_entry.emit("%s 使用疾风符逃脱 %s" % [cultivator_name, other.cultivator_name], "fight")
+				continue
+			continue  # 弱方不主动出手
 		var ratio: float = (my_power - other_power) / maxf(my_power, 1.0)
+		if use_fatal: ratio *= 1.5
+		if use_fire:
+			_add_event("用爆炎符")
 		if ratio > 0.5:
 			wins += 1
-			# 夺取随身物
+			# 夺取随身物（战斗物品已打坏，不掠夺）
 			var op: Dictionary = other.get("inventory")
 			if op:
 				for key in op:
+					if key.begins_with("cb_"): continue
 					if op[key] > 0:
 						inventory[key] = inventory.get(key, 0) + op[key]
 				_add_event("战利品")
@@ -698,11 +732,18 @@ func _check_combat() -> void:
 				eb.event_log_entry.emit("%s 斩杀 %s" % [cultivator_name, other.cultivator_name], "fight")
 		elif ratio > 0.2:
 			wins += 1
-			other.set("losses", other.get("losses") + 1)
-			other.set("injured_ticks", 10)
-			other.combat_cooldown = 10.0
-			if eb:
-				eb.event_log_entry.emit("%s 重伤 %s，后者逃走" % [cultivator_name, other.cultivator_name], "fight")
+			# 对方检查金刚符
+			var oinv: Dictionary = other.get("inventory")
+			if oinv.get("cb_shield", 0) > 0:
+				oinv["cb_shield"] -= 1
+				other.set("injured_ticks", 3)
+				if eb: eb.event_log_entry.emit("%s 重伤 %s，金刚符护体降为击退" % [cultivator_name, other.cultivator_name], "fight")
+			else:
+				other.set("losses", other.get("losses") + 1)
+				other.set("injured_ticks", 10)
+				other.combat_cooldown = 10.0
+				if eb:
+					eb.event_log_entry.emit("%s 重伤 %s，后者逃走" % [cultivator_name, other.cultivator_name], "fight")
 		else:
 			wins += 1
 			other.set("losses", other.get("losses") + 1)

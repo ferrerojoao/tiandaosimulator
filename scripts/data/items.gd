@@ -40,3 +40,11 @@ static var SPECIALS = [
 	{id="spec_boundary_stone", name="破界石", desc="化神→渡劫突破必备"},
 	{id="spec_spirit_orb", name="聚灵珠", desc="当前位置灵气拉满 1.0，持续 50 tick"},
 ]
+
+# === 战斗物品（一次性消耗，斩杀不掠夺，已打坏） ===
+static var COMBAT_ITEMS = [
+	{id="cb_fire", name="爆炎符", desc="战斗时自动使用，战力+40"},
+	{id="cb_shield", name="金刚符", desc="受到重伤时消耗，降为击退"},
+	{id="cb_escape", name="疾风符", desc="弱方遭遇战斗时消耗，必定逃脱"},
+	{id="cb_fatal", name="破甲符", desc="进攻时自动使用，伤害倍率×1.5"},
+]

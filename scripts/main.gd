@@ -317,6 +317,8 @@ func _show_detail_popup(c: Node2D) -> void:
 				if t["id"] == k: name = "书·" + t["name"]; break
 			for s in pill_data.SPECIALS:
 				if s["id"] == k: name = s["name"]; break
+			for ci in pill_data.COMBAT_ITEMS:
+				if ci["id"] == k: name = ci["name"]; break
 			pl += "%s×%d " % [name, pills[k]]
 	pill_data.queue_free()
 	vbox.add_child(_dl_label("随身: %s" % (pl if pl else "无")))

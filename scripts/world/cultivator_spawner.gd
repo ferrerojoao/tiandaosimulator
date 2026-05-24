@@ -87,6 +87,11 @@ func _spawn_cultivators(wm: Node) -> void:
 		for _j in randi_range(0, 2):
 			var tid: String = TECH_POOL.pick_random()
 			bag[tid] = bag.get(tid, 0) + 1
+		# 随机战斗物品 0~2 个
+		var cb_pool: Array[String] = ["cb_fire","cb_shield","cb_escape","cb_fatal"]
+		for _j in randi_range(0, 2):
+			var cid: String = cb_pool.pick_random()
+			bag[cid] = bag.get(cid, 0) + 1
 		c.set("inventory", bag)
 		var target: String = queue[i]
 		if target != "":
