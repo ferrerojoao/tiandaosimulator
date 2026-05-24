@@ -56,6 +56,8 @@ var pill_life_used: bool = false
 var life_bonus: int = 0
 var learn_book: String = ""  # 正在学的功法书名
 var learn_progress: float = 0.0  # 0~1
+var is_in_encounter: bool = false
+var encounter_timer: int = 0
 
 # 战斗
 var combat_cooldown: float = 0.0
@@ -205,6 +207,13 @@ func _on_tick(_year: int, _season: int) -> void:
 		_add_event("服延寿丹，寿元+50")
 	
 	_tick_learning()
+	
+	# === 奇遇倒计时 ===
+	if is_in_encounter and encounter_timer > 0:
+		encounter_timer -= 1
+		if encounter_timer <= 0:
+			var em = get_node_or_null("/root/EncounterManager")
+			if em: em.finish_encounter(self)
 	
 	if injured_ticks > 0:
 		injured_ticks -= 1
@@ -372,6 +381,14 @@ func _process(delta: float) -> void:
 		_newborn_ai(delta)
 		return
 	
+	# 奇遇中：原地不动，不被攻击，倒计时
+	if is_in_encounter:
+		if encounter_timer > 0:
+			return
+		var em = get_node_or_null("/root/EncounterManager")
+		if em: em.finish_encounter(self)
+		return
+	
 	# 领地推斥：非本宗门不可进入
 	var push = _territory_push()
 	if push != Vector2.ZERO:
@@ -463,10 +480,16 @@ func _decide_behavior() -> void:
 		var item_id: String = BREAK_ITEMS.get(realm, "")
 		if item_id != "" and inventory.get(item_id, 0) <= 0:
 			ai_goal = "寻求" + item_id
+			# 优先去最近的奇遇点
+			if _try_go_encounter(): return
 			_pick_wander_target()
 			return
 	
-	# 5. 筹备
+	# 5. 前往奇遇
+	if injured_ticks <= 0 and _try_go_encounter():
+		return
+	
+	# 6. 筹备
 	if cultivation_exp >= EXP_TO_NEXT[realm]:
 		ai_goal = "筹备突破"
 		var target = _find_breakthrough_prep_target()
@@ -475,7 +498,7 @@ func _decide_behavior() -> void:
 			wander_cooldown = randf_range(2.0, 4.0)
 			return
 	
-	# 6. 寻灵
+	# 7. 寻灵
 	if cultivation_exp < EXP_TO_NEXT[realm]:
 		ai_goal = "寻灵修炼"
 		var spirit_target = _find_high_spirit()
@@ -484,7 +507,7 @@ func _decide_behavior() -> void:
 			wander_cooldown = randf_range(2.0, 4.0)
 			return
 	
-	# 7. 游历
+	# 8. 游历
 	ai_goal = "游历"
 	if sect != "" and randf() < 0.6:
 		var sect_pos = _find_sect_pos()
@@ -563,6 +586,16 @@ func _find_breakthrough_prep_target():
 			best_pos = Vector2(x * 32 + 16, y * 32 + 16)
 	if best_score > 0: return best_pos
 	return null
+
+func _try_go_encounter() -> bool:
+	var em = get_node_or_null("/root/EncounterManager")
+	if not em: return false
+	var enc: Dictionary = em.check_nearby(position)
+	if enc.is_empty(): return false
+	if not em.try_enter(self, enc): return false
+	wander_target = Vector2(enc["grid_x"] * 32 + 16, enc["grid_y"] * 32 + 16)
+	ai_goal = "前往奇遇"
+	return true
 
 func _find_sect_pos():
 	var spawner = get_parent()
@@ -796,6 +829,7 @@ func _check_combat() -> void:
 		if position.distance_to(other.position) > 60: continue
 		if sect != "" and sect == other.get("sect"): continue  # 同宗不战
 		if is_newborn or other.get("is_newborn"): continue  # 新生儿互不攻击
+		if is_in_encounter or other.get("is_in_encounter"): continue  # 奇遇中不战
 		var my_power: float = get_combat_power()
 		var other_power: float = other.get_combat_power()
 		var eb = get_node_or_null("/root/EventBus")
