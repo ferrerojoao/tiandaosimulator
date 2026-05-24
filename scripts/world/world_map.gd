@@ -344,20 +344,32 @@ func _place_sects() -> void:
 	sect_positions.clear()
 	capital_pos = Vector2i(-1, -1)
 	
-	# 京城：地图中心附近，预留 30 格隔离区
-	var cx: int = MAP_WIDTH / 2 + _rng.randi_range(-5, 5)
-	var cy: int = MAP_HEIGHT / 2 + _rng.randi_range(-5, 5)
-	capital_pos = Vector2i(clampi(cx, 10, MAP_WIDTH - 11), clampi(cy, 10, MAP_HEIGHT - 11))
-	# 京城周围清出一片平地
-	for dy in [-3, -2, -1, 0, 1, 2, 3]:
-		for dx in [-3, -2, -1, 0, 1, 2, 3]:
-			var nx: int = capital_pos.x + dx
-			var ny: int = capital_pos.y + dy
-			if _in_bounds(Vector2i(nx, ny)):
-				terrain_map[ny][nx] = Terrain.PLAIN
-				spirit_density_map[ny][nx] = 0.7
-	
+	# 京城：地图中心附近，必须在陆地上
+	var cx: int = MAP_WIDTH / 2
+	var cy: int = MAP_HEIGHT / 2
 	var water: Array = [Terrain.DEEP_WATER, Terrain.SHALLOW_WATER]
+	var best_cx: int = cx; var best_cy: int = cy
+	var best_dist: int = 9999
+	for dy in range(-20, 21):
+		for dx in range(-20, 21):
+			var nx: int = cx + dx; var ny: int = cy + dy
+			if nx < 10 or nx >= MAP_WIDTH - 10 or ny < 10 or ny >= MAP_HEIGHT - 10: continue
+			if terrain_map[ny][nx] in water: continue
+			var d: int = abs(dx) + abs(dy)
+			if d < best_dist:
+				best_dist = d; best_cx = nx; best_cy = ny
+	capital_pos = Vector2i(best_cx, best_cy)
+	# 京城领地内无灵气（15格半径）
+	var cap_r: int = 15
+	for dy in range(-cap_r, cap_r + 1):
+		for dx in range(-cap_r, cap_r + 1):
+			if dx * dx + dy * dy <= cap_r * cap_r:
+				var nx: int = capital_pos.x + dx
+				var ny: int = capital_pos.y + dy
+				if _in_bounds(Vector2i(nx, ny)):
+					spirit_density_map[ny][nx] = 0.0
+					spirit_element_map[ny][nx] = Element.NONE
+	
 	var attempts: int = 0
 	while sect_positions.size() < 6 and attempts < 2000:
 		attempts += 1

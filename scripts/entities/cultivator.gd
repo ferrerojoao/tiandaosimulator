@@ -293,6 +293,14 @@ func _process(delta: float) -> void:
 	if is_newborn:
 		_newborn_ai(delta)
 		return
+	
+	# 领地推斥：非本宗门不可进入
+	var push = _territory_push()
+	if push != Vector2.ZERO:
+		wander_target = position + push * 200.0
+		position = position.move_toward(position + push * 50.0, move_speed * 3.0 * delta)
+		return
+	
 	wander_cooldown -= delta
 	if wander_cooldown <= 0.0:
 		_decide_behavior()
@@ -478,6 +486,25 @@ func _find_sect_by_name(sn: String):
 			return node.position
 	return null
 
+func _territory_push() -> Vector2:
+	if sect == "" or is_newborn: return Vector2.ZERO
+	var spawner = get_parent()
+	if not spawner: return Vector2.ZERO
+	var push_dir: Vector2 = Vector2.ZERO
+	for node in spawner.get_children():
+		if not node.get("sect_name"): continue
+		if node.get("is_capital"): continue  # 京城可以进
+		if node.get("sect_name") == sect: continue  # 自己宗门
+		var dist: float = position.distance_to(node.position)
+		var r: int = node.get("territory_radius")
+		if dist < r * 32:
+			return (position - node.position).normalized()
+	return Vector2.ZERO
+
+func _inside_capital() -> bool:
+	var cp = _find_capital_pos()
+	return cp != null and position.distance_to(cp) < 480.0  # 京城领地15格
+
 func _find_capital_pos():
 	var spawner = get_parent()
 	if not spawner: return null
@@ -551,6 +578,7 @@ func _check_combat() -> void:
 	if combat_cooldown > 0:
 		combat_cooldown -= 1
 		return
+	if _inside_capital(): return  # 京城内禁止攻击
 	var spawner = get_parent()
 	if not spawner: return
 	for other in spawner.get_children():

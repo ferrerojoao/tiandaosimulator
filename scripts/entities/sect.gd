@@ -58,6 +58,10 @@ func setup(p_idx: int, p_pos: Vector2, p_name: String = "", p_capital: bool = fa
 	queue_redraw()
 
 func _draw() -> void:
+	if territory_radius > 0:
+		var col: Color = _sect_colors[color_index % _sect_colors.size()]
+		col.a = 0.12
+		draw_circle(Vector2.ZERO, territory_radius * 32, col, true)
 	if is_selected:
 		draw_circle(Vector2.ZERO, 72, Color.GOLD, false, 2)
 
