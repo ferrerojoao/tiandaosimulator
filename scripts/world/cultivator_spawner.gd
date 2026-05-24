@@ -93,6 +93,7 @@ func _spawn_cultivators(wm: Node) -> void:
 			var cid: String = cb_pool.pick_random()
 			bag[cid] = bag.get(cid, 0) + 1
 		c.set("inventory", bag)
+		c.set("spirit_stones", randi_range(5, 20))
 		var target: String = queue[i]
 		if target != "":
 			c.set("newborn_target_sect", target)

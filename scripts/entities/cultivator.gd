@@ -175,6 +175,14 @@ func _on_tick(_year: int, _season: int) -> void:
 	if not alive: return
 	if realm >= Realm.TRIBULATION: return
 	
+	# === 宗门俸禄（每年第一季） ===
+	if _season == 0 and sect != "":
+		var salary: int = realm + 1 + randi_range(0, 4)
+		spirit_stones += salary
+	
+	# === 灵石兑换 ===
+	_try_exchange()
+	
 	# === 丹药自动使用 ===
 	if injured_ticks > 0 and inventory.get("pill_heal", 0) > 0:
 		inventory["pill_heal"] -= 1
@@ -218,7 +226,12 @@ func _on_tick(_year: int, _season: int) -> void:
 		return
 	
 	cultivation_exp += CULT_SPEED[realm] * speed_mult * get_cultivation_mult()
+	# 修为上限锁定，多余浪费
 	if EXP_TO_NEXT[realm] > 0 and cultivation_exp >= EXP_TO_NEXT[realm]:
+		var overflow: float = cultivation_exp - EXP_TO_NEXT[realm]
+		cultivation_exp = EXP_TO_NEXT[realm]
+		if overflow > CULT_SPEED[0] * 2:
+			_add_event("修为溢出")
 		_attempt_breakthrough()
 	_check_combat()
 
@@ -309,7 +322,8 @@ func _finish_breakthrough() -> void:
 			eb.cultivator_breakthrough.emit(self, old_realm, realm)
 			eb.event_log_entry.emit("%s 突破至 %s！" % [cultivator_name, REALM_NAMES[realm]], "cult")
 	else:
-		cultivation_exp *= 0.7
+		cultivation_exp = 0.0
+		_add_event("突破失败")
 		# 失败惩罚
 		match realm:
 			Realm.QI_REFINING:
@@ -674,6 +688,45 @@ func _tick_learning() -> void:
 		_add_event("学会%s" % tech["name"])
 		learn_book = ""
 		learn_progress = 0.0
+
+func _try_exchange() -> void:
+	if spirit_stones < 5: return
+	# 只有宗门成员在宗门，或任何人在京城才能兑换
+	var near_shop: bool = false
+	if _is_at_capital(): near_shop = true
+	if sect != "" and _is_at_sect(): near_shop = true
+	if not near_shop: return
+	if randf() > 0.3: return  # 30%概率尝试购买
+	
+	# 随机挑一件可买物品
+	var items_data = load("res://scripts/data/items.gd")
+	var shop: Array = []
+	# 不可兑换：化神丹/渡劫丹/地阶天阶功法
+	var banned: Array[String] = ["pill_divine","pill_trib","tech_cult_earth","tech_cult_heaven","tech_combat_earth","tech_combat_heaven"]
+	var pill_price: Dictionary = {
+		"pill_qi": 5, "pill_build_foundation": 20, "pill_form_core": 30,
+		"pill_nascent": 50, "pill_heal": 8, "pill_life": 100,
+	}
+	for p in items_data.PILLS:
+		if p["id"] in banned: continue
+		var pr: int = pill_price.get(p["id"], 10)
+		shop.append({"id": p["id"], "name": p["name"], "price": pr})
+	for t in items_data.TECHNIQUES:
+		if t["id"] in banned: continue
+		var grade: int = t.get("grade", 0)
+		shop.append({"id": t["id"], "name": "书·" + t["name"], "price": (grade + 1) * 10 + grade * grade * 10})
+	# 战斗符（很贵）
+	for ci in items_data.COMBAT_ITEMS:
+		var price: int = 80 if ci["id"] in ["cb_shield","cb_escape"] else 120
+		shop.append({"id": ci["id"], "name": ci["name"], "price": price})
+	
+	var item: Dictionary = shop.pick_random()
+	if item["price"] > spirit_stones: return
+	if randf() > 0.4: return  # 40%有货，60%缺货
+	
+	spirit_stones -= item["price"]
+	inventory[item["id"]] = inventory.get(item["id"], 0) + 1
+	_add_event("购得%s(%d灵石)" % [item["name"], item["price"]])
 
 func _check_combat() -> void:
 	if combat_cooldown > 0:
