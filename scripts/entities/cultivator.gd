@@ -513,6 +513,23 @@ func _decide_behavior() -> void:
 			wander_cooldown = randf_range(2.0, 4.0)
 			return
 	
+	# 7. 购物
+	if spirit_stones >= 10 and randf() < 0.15 and injured_ticks <= 0:
+		if sect != "":
+			ai_goal = "回宗采购"
+			var sect_pos = _find_sect_pos()
+			if sect_pos:
+				wander_target = sect_pos
+				wander_cooldown = randf_range(3.0, 6.0)
+				return
+		else:
+			ai_goal = "前往京城采购"
+			var cap_pos = _find_capital_pos()
+			if cap_pos:
+				wander_target = cap_pos
+				wander_cooldown = randf_range(3.0, 6.0)
+				return
+	
 	# 8. 游历
 	ai_goal = "游历"
 	if sect != "" and randf() < 0.6:
@@ -594,6 +611,7 @@ func _find_breakthrough_prep_target():
 	return null
 
 func _try_go_encounter() -> bool:
+	if is_newborn: return false  # 新生儿不受奇遇干扰
 	var em = get_node_or_null("/root/EncounterManager")
 	if not em: return false
 	var enc: Dictionary = em.check_nearby(position)

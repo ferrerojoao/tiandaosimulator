@@ -3,6 +3,8 @@ extends Node
 
 const CULTIVATOR_SCENE: String = "res://scripts/entities/cultivator.gd"
 const SPAWN_COUNT: int = 20
+const POP_CAP: int = 30
+const BIRTH_PER_YEAR: int = 2
 const TECH_POOL: Array[String] = ["tech_cult_mortal","tech_cult_yellow","tech_cult_mystic","tech_cult_earth","tech_cult_heaven","tech_combat_mortal","tech_combat_yellow","tech_combat_mystic","tech_combat_earth","tech_combat_heaven"]
 
 var _surnames: Array[String] = [
@@ -14,9 +16,57 @@ var _given_names: Array[String] = [
 	"云","风","天","雨","雷","月","星","龙","凤","虎",
 	"无极","清扬","子轩","逸尘","凌霄","若云","芷若","追风","破天",
 ]
+var _birth_counter: int = 0
 
 func _ready() -> void:
-	pass
+	var gt = get_node_or_null("/root/GameTime")
+	if gt and gt.has_signal("tick_advanced"):
+		gt.tick_advanced.connect(_on_tick)
+
+func _on_tick(_year: int, season: int) -> void:
+	if season != 0: return  # 每年第一季
+	var alive: int = 0
+	for child in get_children():
+		if child.get("realm") != null and child.get("alive"):
+			alive += 1
+	if alive >= POP_CAP: return
+	
+	# 新生儿数：BIRTH_PER_YEAR 但有随机波动
+	var count: int = mini(BIRTH_PER_YEAR + randi_range(-1, 1), POP_CAP - alive)
+	count = maxi(1, count)
+	
+	var wm = get_node_or_null("/root/main/WorldMap")
+	if not wm or wm.capital_pos.x < 0: return
+	
+	var spawn_pos: Vector2 = Vector2(wm.capital_pos.x * 32 + 16, wm.capital_pos.y * 32 + 16)
+	var sects: Array = []
+	for child in get_children():
+		if child.get("sect_name") != null and not child.get("is_capital"):
+			sects.append(child.get("sect_name"))
+	
+	for _i in count:
+		_birth_counter += 1
+		var c = Node2D.new()
+		c.set_script(load(CULTIVATOR_SCENE))
+		c.name = "Cultivator_B%d" % _birth_counter
+		var offset: Vector2 = Vector2(randf_range(-60, 60), randf_range(-60, 60))
+		c.position = spawn_pos + offset
+		c.setup(_random_name(), _random_realm(), 18)
+		c.set("is_newborn", true)
+		# 新生儿装备：1~3 颗丹药
+		var pool: Array = ["pill_qi","pill_qi","pill_qi","pill_build_foundation","pill_heal","pill_heal","pill_life"]
+		var bag: Dictionary = {}
+		for _j in randi_range(1, 3):
+			var pid: String = pool.pick_random()
+			bag[pid] = bag.get(pid, 0) + 1
+		c.set("inventory", bag)
+		c.set("spirit_stones", randi_range(2, 8))
+		# 新生儿基本都入宗
+		if sects.size() > 0 and randf() < 0.85:
+			c.set("newborn_target_sect", sects.pick_random())
+		add_child(c)
+	
+	print("[Spawner] %d 名新生儿" % count)
 
 func spawn_all() -> void:
 	var wm = get_node_or_null("/root/main/WorldMap")
