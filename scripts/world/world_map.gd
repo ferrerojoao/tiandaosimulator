@@ -215,7 +215,7 @@ func _generate_spirit_maps() -> void:
 		var d_row: Array = []
 		var e_row: Array = []
 		for x in MAP_WIDTH:
-			var s: float = _norm(_noise_spirit.get_noise_2d(x, y)) * 1.3
+			var s: float = _norm(_noise_spirit.get_noise_2d(x, y)) * 0.5
 			var t: int = terrain_map[y][x]
 			# 地形修正
 			if t == Terrain.HIGH_MOUNTAIN: s += 0.2
@@ -290,6 +290,7 @@ func _place_sacred_sites() -> void:
 				if _in_bounds(Vector2i(nx, ny)):
 					terrain_map[ny][nx] = replacement
 					spirit_density_map[ny][nx] = 1.0
+					spirit_element_map[ny][nx] = elem
 		sacred_sites.append({
 			"pos": best_pos,
 			"element": elem,

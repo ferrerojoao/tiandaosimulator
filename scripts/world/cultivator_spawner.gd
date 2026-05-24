@@ -97,9 +97,11 @@ func _spawn_sacred_sites(wm: Node) -> void:
 	print("[Spawner] 生成了 %d 个圣地" % wm.sacred_sites.size())
 
 func _find_spawn_pos(wm: Node) -> Variant:
+	var map_w: int = wm.terrain_map[0].size()
+	var map_h: int = wm.terrain_map.size()
 	for _attempt in 100:
-		var x: int = randi_range(10, 189)
-		var y: int = randi_range(10, 189)
+		var x: int = randi_range(10, map_w - 11)
+		var y: int = randi_range(10, map_h - 11)
 		var t: int = wm.terrain_map[y][x]
 		# 不在深海/高山生成
 		if t == 0 or t == 7: continue
