@@ -60,7 +60,7 @@ func _ready() -> void:
 	_ui_label.add_theme_font_size_override("font_size", 12)
 	_ui_label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.3, 1.0))
 	cl.add_child(_ui_label)
-	connect_tick()
+	call_deferred("connect_tick")
 
 func _process(_delta: float) -> void:
 	_blink_frame += 1
@@ -243,16 +243,58 @@ func try_enter(cultivator: Node, enc: Dictionary) -> bool:
 	return true
 
 func finish_encounter(cultivator: Node) -> void:
+	if not cultivator or not is_instance_valid(cultivator): return
 	for enc in encounters:
 		if enc["occupied"] == str(cultivator.get_path()):
-			_give_reward(cultivator, enc)
+			# 直接给奖励，不走 get/set 避免类型问题
+			var q: int = enc["quality"]
+			var pool: Array = REWARDS.get(q, [])
+			var reward: Dictionary = pool.pick_random()
+			t_send_reward(cultivator, reward, q)
 			var sp = enc.get("_sprite")
 			if sp: sp.queue_free()
 			encounters.erase(enc)
 			break
 	cultivator.set("is_in_encounter", false)
 
+func t_send_reward(cultivator: Node, reward: Dictionary, q: int) -> void:
+	var gt = get_node_or_null("/root/GameTime")
+	var eb = get_node_or_null("/root/EventBus")
+	var cname: String = cultivator.get("cultivator_name") if cultivator.get("cultivator_name") != null else "?"
+	var qname: Array = ["普通", "稀有", "珍贵", "传说"]
+	# 加载物品名映射
+	var item_names: Dictionary = {}
+	var items_data = load("res://scripts/data/items.gd")
+	for p in items_data.PILLS + items_data.TECHNIQUES + items_data.SPECIALS + items_data.COMBAT_ITEMS:
+		item_names[p["id"]] = p["name"]
+	
+	match reward["type"]:
+		"stones":
+			var amt: int = randi_range(reward["min"], reward["max"])
+			if cultivator.has_method("add_stones"):
+				cultivator.add_stones(amt)
+			else:
+				cultivator.set("spirit_stones", cultivator.get("spirit_stones") + amt)
+			var msg: String = "%s %s奇遇获%d灵石" % [cname, qname[q], amt]
+			if cultivator.has_method("_add_event"):
+				cultivator._add_event(msg)
+			if eb: eb.event_log_entry.emit(msg, "cult")
+		"item":
+			var item_id: String = reward["id"]
+			var display_name: String = item_names.get(item_id, item_id)
+			if cultivator.has_method("add_item"):
+				cultivator.add_item(item_id)
+			else:
+				var inv = cultivator.get("inventory")
+				if typeof(inv) == TYPE_DICTIONARY:
+					inv[item_id] = inv.get(item_id, 0) + 1
+			var msg: String = "%s %s奇遇获%s" % [cname, qname[q], display_name]
+			if cultivator.has_method("_add_event"):
+				cultivator._add_event(msg)
+			if eb: eb.event_log_entry.emit(msg, "cult")
+
 func _give_reward(cultivator: Node, enc: Dictionary) -> void:
+	if not cultivator or not is_instance_valid(cultivator): return
 	var q: int = enc["quality"]
 	var pool: Array = REWARDS.get(q, [])
 	var reward: Dictionary = pool.pick_random()

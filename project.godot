@@ -17,11 +17,17 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-MCPRuntimeProbe="*res://addons/godot_mcp/runtime/mcp_runtime_probe.gd"
 EventBus="*res://scripts/autoload/event_bus.gd"
 GameTime="*res://scripts/autoload/game_time.gd"
 SaveManager="*res://scripts/autoload/save_manager.gd"
 EncounterManager="*res://scripts/world/encounter_manager.gd"
+MCPRuntimeProbe="*res://addons/godot_mcp/runtime/mcp_runtime_probe.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
 
 [editor_plugins]
 
@@ -34,9 +40,3 @@ enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
 [rendering]
 
 rendering_device/driver.windows="d3d12"
-
-[display]
-
-window/size/viewport_width=1920
-window/size/viewport_height=1080
-window/stretch/mode="canvas_items"

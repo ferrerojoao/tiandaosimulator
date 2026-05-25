@@ -114,11 +114,11 @@ func load_game() -> void:
 		c.pill_used_breakthrough = cd.get("pill_used_breakthrough", false)
 		c.pill_life_used = cd.get("pill_life_used", false)
 		c.life_bonus = cd.get("life_bonus", 0)
-	c.learn_book = cd.get("learn_book", "")
-	c.learn_progress = cd.get("learn_progress", 0.0)
-	c.relations = cd.get("relations", {})
-	c.personality = cd.get("personality", 1)  # 默认稳健
-	c.talent = cd.get("talent", 0)  # 默认天慧
+		c.learn_book = cd.get("learn_book", "")
+		c.learn_progress = cd.get("learn_progress", 0.0)
+		c.relations = cd.get("relations", {})
+		c.personality = cd.get("personality", 1)
+		c.talent = cd.get("talent", 0)
 		c.wins = cd["wins"]
 		c.losses = cd["losses"]
 		c.life_events = cd["life_events"]

@@ -65,6 +65,7 @@ var learn_progress: float = 0.0  # 0~1
 var is_in_encounter: bool = false
 var encounter_timer: int = 0
 var guided: bool = false
+var overflow_reported: bool = false
 var relations: Dictionary = {}  # { "对方名字": 数值 }
 var personality: int = Personality.STEADY
 var talent: int = Talent.SKY_WISDOM
@@ -260,11 +261,11 @@ func _on_tick(_year: int, _season: int) -> void:
 		return
 	
 	cultivation_exp += CULT_SPEED[realm] * speed_mult * get_cultivation_mult()
-	# 修为上限锁定，多余浪费
+	# 修为上限锁定
 	if EXP_TO_NEXT[realm] > 0 and cultivation_exp >= EXP_TO_NEXT[realm]:
-		var overflow: float = cultivation_exp - EXP_TO_NEXT[realm]
 		cultivation_exp = EXP_TO_NEXT[realm]
-		if overflow > CULT_SPEED[0] * 2:
+		if not overflow_reported:
+			overflow_reported = true
 			_add_event("修为溢出")
 		_attempt_breakthrough()
 	_check_combat()
@@ -367,6 +368,7 @@ func _finish_breakthrough() -> void:
 		var old_realm: int = realm
 		realm += 1
 		cultivation_exp = 0.0
+		overflow_reported = false
 		queue_redraw()
 		var hm: int = [5, 10, 20, 50, 100, 200][old_realm]
 		if gt: gt.add_hm(hm)
@@ -376,6 +378,7 @@ func _finish_breakthrough() -> void:
 			eb.event_log_entry.emit("%s 突破至 %s！" % [cultivator_name, REALM_NAMES[realm]], "cult")
 	else:
 		cultivation_exp = 0.0
+		overflow_reported = false
 		_add_event("突破失败")
 		# 失败惩罚
 		match realm:
@@ -417,7 +420,7 @@ func _process(delta: float) -> void:
 		position = position.move_toward(position + push * 50.0, move_speed * 3.0 * delta)
 		return
 	
-	# 同宗避让（游历/寻灵/购物时避免叠一起）
+	# 同宗避让
 	if sect != "" and not guided and ai_goal in ["游历", "寻灵修炼", "回宗采购", "前往京城采购", "筹备突破"]:
 		var avoid: Vector2 = Vector2.ZERO
 		var spawner = get_parent()
@@ -426,10 +429,12 @@ func _process(delta: float) -> void:
 				if other == self: continue
 				if other.get("sect") != sect: continue
 				var d: float = position.distance_to(other.position)
-				if d < 20 and d > 0.1:
-					avoid += (position - other.position).normalized() / d * 40.0
-		if avoid.length() > 0.1:
-			position = position.move_toward(position + avoid.normalized() * 40.0, move_speed * 2.0 * delta)
+				if d < 80 and d > 0.01:
+					avoid += (position - other.position).normalized() / maxf(d, 1.0)
+		if avoid.length() > 0.01:
+			wander_target = position + avoid.normalized() * 80.0
+			wander_cooldown = randf_range(1.0, 3.0)
+			position = position.move_toward(wander_target, move_speed * 2.0 * delta)
 			return
 	
 	wander_cooldown -= delta
@@ -835,16 +840,17 @@ func _tick_learning() -> void:
 			for t in techniques:
 				if t.get("id") == key: known = true; break
 			if known: continue
-			# 开始学
+			# 开始学（书暂时保留）
 			learn_book = key
-			inventory[key] -= 1
-			if inventory[key] <= 0: inventory.erase(key)
 			learn_progress = 0.0
 			break
 		if learn_book == "": return
 	
 	var tech: Dictionary = _tech_cache.get(learn_book, {})
 	if tech.is_empty(): 
+		learn_book = ""; return
+	# 书丢了就停学
+	if inventory.get(learn_book, 0) <= 0:
 		learn_book = ""; return
 	
 	var grade: int = tech.get("grade", 0)
@@ -858,7 +864,9 @@ func _tick_learning() -> void:
 	if talent == Talent.SKY_WISDOM: speed *= 2.0
 	learn_progress += speed
 	if learn_progress >= 1.0:
-		# 学成！功法书已消耗，获得功法
+		# 学成！消耗功法书，获得功法
+		inventory[learn_book] = inventory.get(learn_book, 1) - 1
+		if inventory[learn_book] <= 0: inventory.erase(learn_book)
 		techniques.append(tech.duplicate())
 		_add_event("学会%s" % tech["name"])
 		learn_book = ""
@@ -938,12 +946,13 @@ func _check_combat() -> void:
 			var r: float = other.perceive_combat_power() / maxf(perceive_combat_power(), 1.0)
 			# 贵重物品加重攻击倾向
 			var loot_score: float = 0.0
-			var inv: Dictionary = other.get("inventory", {})
+			var inv = other.get("inventory")
+			if inv == null: inv = {}
 			for key in inv:
 				if key.begins_with("spec_"): loot_score += 0.5
 				elif key.begins_with("tech_cult_earth") or key.begins_with("tech_combat_earth"): loot_score += 0.3
 				elif key.begins_with("tech_cult_heaven") or key.begins_with("tech_combat_heaven"): loot_score += 0.4
-			loot_score += other.get("spirit_stones", 0) * 0.002
+			var ss = other.get("spirit_stones"); loot_score += (ss if ss != null else 0) * 0.002
 			r -= loot_score  # 越诱人 r 越小，越优先打
 			if r < best_score:
 				best_score = r
@@ -962,10 +971,14 @@ func _check_combat() -> void:
 	for other in all_cults:
 		if other == target: continue
 		if position.distance_to(target.position) > 80: continue
-		if other.get("injured_ticks", 0) > 10: continue  # 重伤不能帮忙
+		if other.get("injured_ticks") > 10: continue  # 重伤不能帮忙
 		# 对方对我的看法
-		var their_rel_to_me: float = other.get("relations", {}).get(cultivator_name, 0.0)
-		var their_rel_to_target: float = other.get("relations", {}).get(target.cultivator_name, 0.0)
+		var their_rel_to_me: float = 0.0
+		var their_rel_to_target: float = 0.0
+		var rels = other.get("relations")
+		if rels != null:
+			their_rel_to_me = rels.get(cultivator_name, 0.0)
+			their_rel_to_target = rels.get(target.cultivator_name, 0.0)
 		if their_rel_to_me >= 40 and their_rel_to_target < 40:
 			side_a.append(other)
 		elif their_rel_to_target >= 40 and their_rel_to_me < 40:
@@ -1059,3 +1072,9 @@ func _add_event(text: String) -> void:
 	var gt = get_node_or_null("/root/GameTime")
 	var yr: int = gt.current_year if gt else 0
 	life_events.append({"year": yr, "text": text, "realm": REALM_NAMES[realm] if realm < REALM_NAMES.size() else "?"})
+
+func add_stones(amt: int) -> void:
+	spirit_stones += amt
+
+func add_item(item_id: String) -> void:
+	inventory[item_id] = inventory.get(item_id, 0) + 1
