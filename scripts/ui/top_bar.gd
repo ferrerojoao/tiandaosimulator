@@ -7,6 +7,20 @@ extends PanelContainer
 @onready var hm_label: Label = $HBoxContainer/LabelHeavenlyMechanism
 
 func _ready() -> void:
+	# 暗色顶栏
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color(0.05, 0.05, 0.12, 0.92)
+	sb.content_margin_left = 12; sb.content_margin_right = 12
+	sb.content_margin_top = 4; sb.content_margin_bottom = 4
+	add_theme_stylebox_override("panel", sb)
+	year_label.add_theme_color_override("font_color", Color(0.78, 0.63, 0.31))
+	year_label.add_theme_font_size_override("font_size", 20)
+	season_label.add_theme_color_override("font_color", Color(0.7, 0.68, 0.62))
+	season_label.add_theme_font_size_override("font_size", 16)
+	speed_label.add_theme_color_override("font_color", Color(0.7, 0.68, 0.62))
+	speed_label.add_theme_font_size_override("font_size", 16)
+	hm_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.6))
+	hm_label.add_theme_font_size_override("font_size", 16)
 	_update_display()
 	GameTime.season_changed.connect(_on_season_changed)
 	GameTime.speed_changed.connect(_on_speed_changed)

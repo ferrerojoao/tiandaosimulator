@@ -17,6 +17,26 @@ func _ready() -> void:
 		eb.cultivator_selected.connect(_on_cultivator_selected)
 		eb.sect_selected.connect(_on_sect_selected)
 		eb.tile_selected.connect(_on_tile_selected)
+	# 暗色主题
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color(0.06, 0.06, 0.14, 0.90)
+	sb.border_width_left = 1; sb.border_width_right = 1
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_color = Color(0.78, 0.63, 0.31, 0.6)
+	sb.corner_radius_top_left = 6; sb.corner_radius_top_right = 6
+	sb.corner_radius_bottom_left = 6; sb.corner_radius_bottom_right = 6
+	sb.content_margin_left = 10; sb.content_margin_right = 10
+	sb.content_margin_top = 6; sb.content_margin_bottom = 6
+	add_theme_stylebox_override("panel", sb)
+	# 字体颜色
+	lbl_name.add_theme_color_override("font_color", Color(0.9, 0.82, 0.55))
+	lbl_name.add_theme_font_size_override("font_size", 20)
+	lbl_line1.add_theme_color_override("font_color", Color(0.78, 0.63, 0.31))
+	lbl_line1.add_theme_font_size_override("font_size", 15)
+	lbl_line2.add_theme_color_override("font_color", Color(0.75, 0.7, 0.65))
+	lbl_line2.add_theme_font_size_override("font_size", 15)
+	lbl_line3.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+	lbl_line4.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 	visible = false
 
 func _on_detail_pressed() -> void:

@@ -416,14 +416,16 @@ func render_tilemap() -> void:
 		for x in MAP_WIDTH:
 			var t: int = terrain_map[y][x]
 			tilemap.set_cell(Vector2i(x, y), 0, Vector2i(t, 0))
+	tilemap.modulate = Color(0.55, 0.55, 0.55)
 	print("[WorldMap] 渲染完成: cells=%d" % tilemap.get_used_cells().size())
 
 func _on_season_changed(_year: int, season: int, _name: String) -> void:
+	var base = Color(0.55, 0.55, 0.55)  # 整体降暗
 	match season:
-		0: tilemap.modulate = Color(1.0, 1.0, 1.0, 1.0)
-		1: tilemap.modulate = Color(0.92, 1.0, 0.92, 1.0)
-		2: tilemap.modulate = Color(1.0, 0.90, 0.75, 1.0)
-		3: tilemap.modulate = Color(0.88, 0.93, 1.0, 1.0)
+		0: tilemap.modulate = base
+		1: tilemap.modulate = base * Color(0.92, 1.0, 0.92)
+		2: tilemap.modulate = base * Color(1.0, 0.90, 0.75)
+		3: tilemap.modulate = base * Color(0.88, 0.93, 1.0)
 
 func _norm(v: float) -> float:
 	return (v + 1.0) * 0.5

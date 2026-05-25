@@ -334,7 +334,22 @@ func save_game() -> void:
 	else: print("[Save] 存档失败")
 
 func _dl_label(text: String) -> Label:
-	var l = Label.new(); l.text = text; l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; return l
+	var l = Label.new(); l.text = text; l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.add_theme_color_override("font_color", Color(0.9, 0.88, 0.82))
+	l.add_theme_font_size_override("font_size", 15)
+	return l
+
+func _style_panel(panel: PanelContainer) -> void:
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color(0.08, 0.08, 0.16, 0.94)
+	sb.border_width_left = 2; sb.border_width_right = 2
+	sb.border_width_top = 2; sb.border_width_bottom = 2
+	sb.border_color = Color(0.78, 0.63, 0.31, 0.8)
+	sb.corner_radius_top_left = 8; sb.corner_radius_top_right = 8
+	sb.corner_radius_bottom_left = 8; sb.corner_radius_bottom_right = 8
+	sb.content_margin_left = 12; sb.content_margin_right = 12
+	sb.content_margin_top = 8; sb.content_margin_bottom = 8
+	panel.add_theme_stylebox_override("panel", sb)
 
 func _show_detail_popup(c: Node2D) -> void:
 	_close_detail_popup()
@@ -348,6 +363,7 @@ func _show_detail_popup(c: Node2D) -> void:
 	panel.offset_left = -190; panel.offset_top = -250
 	panel.offset_right = 190; panel.offset_bottom = 250
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_style_panel(panel)
 	var vbox = VBoxContainer.new(); panel.add_child(vbox)
 	vbox.add_child(_dl_label("▎%s" % c.get("cultivator_name")))
 	vbox.add_child(_dl_label("境界: %s" % c.get("REALM_NAMES")[c.get("realm")]))
@@ -403,7 +419,10 @@ func _show_detail_popup(c: Node2D) -> void:
 			vbox.add_child(_dl_label("[%d年] %s %s" % [evt["year"], evt.get("realm", ""), evt["text"]]))
 		else:
 			vbox.add_child(_dl_label(str(evt)))
-	var btn = Button.new(); btn.text = "关闭"; btn.pressed.connect(_close_detail_popup); vbox.add_child(btn)
+	var btn = Button.new(); btn.text = "关闭"; btn.pressed.connect(_close_detail_popup)
+	btn.add_theme_font_size_override("font_size", 16)
+	btn.add_theme_color_override("font_color", Color(0.78, 0.63, 0.31))
+	vbox.add_child(btn)
 	ui.add_child(panel)
 	_detail_popup = panel
 

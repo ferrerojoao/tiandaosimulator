@@ -50,34 +50,16 @@ static var REWARDS: Dictionary = {
 
 func _ready() -> void:
 	_tick_timer = SPAWN_INTERVAL
-	# UI 坐标提示
-	var cl = CanvasLayer.new()
-	cl.layer = 100
-	add_child(cl)
-	# 顶栏高度约30px，放在下方
-	_ui_label = Label.new()
-	_ui_label.position = Vector2(10, 32)
-	_ui_label.add_theme_font_size_override("font_size", 12)
-	_ui_label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.3, 1.0))
-	cl.add_child(_ui_label)
 	call_deferred("connect_tick")
 
 func _process(_delta: float) -> void:
 	_blink_frame += 1
-	# 更新坐标提示 + 闪烁标记
-	if _ui_label:
-		var txt: String = "奇遇: "
-		var qs: Array = ["普通", "稀有", "珍贵", "传说"]
-		for enc in encounters:
-			if enc["occupied"] != "": continue
-			txt += "%s(%d,%d) " % [qs[enc["quality"]], enc["grid_x"], enc["grid_y"]]
-			# 闪烁光晕
-			var sp: Sprite2D = enc.get("_sprite")
-			if sp:
-				var pulse: float = sin(_blink_frame * 0.08) * 0.3 + 0.7
-				sp.self_modulate = Color(1, 1, 1, pulse)
-		if encounters.is_empty() or _all_occupied(): txt += "无"
-		_ui_label.text = txt
+	for enc in encounters:
+		if enc["occupied"] != "": continue
+		var sp: Sprite2D = enc.get("_sprite")
+		if sp:
+			var pulse: float = sin(_blink_frame * 0.08) * 0.3 + 0.7
+			sp.self_modulate = Color(1, 1, 1, pulse)
 
 func _all_occupied() -> bool:
 	for enc in encounters:
