@@ -34,12 +34,16 @@ func _input(event: InputEvent) -> void:
 		_right_click(world_pos, event.position)
 
 func start_new_game() -> void:
+	var am = get_node_or_null("/root/AudioManager")
+	if am: am.play_bgm("游戏音乐.ogg")
 	$UI/Menu.hide()
 	$WorldMap.generate_world()
 	$CultivatorSpawner.spawn_all()
 	print("[Main] 新游戏就绪")
 
 func load_game() -> void:
+	var am = get_node_or_null("/root/AudioManager")
+	if am: am.play_bgm("游戏音乐.ogg")
 	var sm = get_node_or_null("/root/SaveManager")
 	if not sm: return
 	var data: Dictionary = sm.load_game()
@@ -178,6 +182,8 @@ func _left_click(world_pos: Vector2) -> void:
 			eb.tile_selected.emit(int(world_pos.x / 32.0), int(world_pos.y / 32.0))
 
 func _right_click(world_pos: Vector2, screen_pos: Vector2) -> void:
+	var am = get_node_or_null("/root/AudioManager")
+	if am: am.play_click()
 	var tile_x: int = int(world_pos.x / 32.0)
 	var tile_y: int = int(world_pos.y / 32.0)
 	var popup = PopupMenu.new()

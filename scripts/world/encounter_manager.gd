@@ -240,6 +240,8 @@ func finish_encounter(cultivator: Node) -> void:
 	cultivator.set("is_in_encounter", false)
 
 func t_send_reward(cultivator: Node, reward: Dictionary, q: int) -> void:
+	var am = get_node_or_null("/root/AudioManager")
+	if am: am.play_loot()
 	var gt = get_node_or_null("/root/GameTime")
 	var eb = get_node_or_null("/root/EventBus")
 	var cname: String = cultivator.get("cultivator_name") if cultivator.get("cultivator_name") != null else "?"

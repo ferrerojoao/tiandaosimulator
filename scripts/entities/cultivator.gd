@@ -382,6 +382,8 @@ func _finish_breakthrough() -> void:
 		if eb:
 			eb.cultivator_breakthrough.emit(self, old_realm, realm)
 			eb.event_log_entry.emit("%s 突破至 %s！" % [cultivator_name, REALM_NAMES[realm]], "cult")
+		var am = get_node_or_null("/root/AudioManager")
+		if am: am.play_success()
 	else:
 		cultivation_exp = 0.0
 		overflow_reported = false
@@ -1082,6 +1084,8 @@ func _check_combat() -> void:
 					if op[key] > 0:
 						inventory[key] = inventory.get(key, 0) + op[key]
 			c.die(false, "被斩杀")  # 斩杀：不留物品
+			var am = get_node_or_null("/root/AudioManager")
+			if am: am.play_kill()
 			_mod_relation(c, -25)
 		for c in side_a:
 			if c != self:
@@ -1200,6 +1204,8 @@ func _try_loot_tombstone() -> void:
 		var loot = child.try_loot()
 		if loot.is_empty(): return
 		_loot_cooldown = 2.0
+		var am = get_node_or_null("/root/AudioManager")
+		if am: am.play_loot()
 		if loot.has("stones"):
 			spirit_stones += loot["stones"]
 			var eb = get_node_or_null("/root/EventBus")

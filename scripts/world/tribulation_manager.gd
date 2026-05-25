@@ -127,8 +127,24 @@ func _do_strike(pos: Vector2) -> void:
 						end_tribulation(false)
 						return
 	
-	_flashes.append({"pos": pos, "timer": 0.3})
+	_flashes.append({"pos": pos, "timer": 0.3, "bolt": _gen_lightning(pos)})
+	var am = get_node_or_null("/root/AudioManager")
+	if am: am.play_thunder()
 	_striking = false
+
+func _gen_lightning(hit_pos: Vector2) -> Array:
+	"""预生成闪电折线"""
+	var top: float = hit_pos.y - 400
+	var points: Array = [Vector2(hit_pos.x, top)]
+	var y: float = top
+	var x: float = hit_pos.x
+	var segments: int = randi_range(6, 10)
+	for i in segments:
+		y += (hit_pos.y - top) / segments
+		x += randf_range(-25, 25)
+		points.append(Vector2(x, y))
+	points.append(hit_pos)
+	return points
 
 func strike_at(pos: Vector2) -> void:
 	"""玩家手动落雷"""
@@ -162,6 +178,8 @@ func end_tribulation(survived: bool) -> void:
 			if target.has_method("_add_event"):
 				target._add_event("渡过雷劫")
 			if eb: eb.event_log_entry.emit("%s 渡过雷劫！" % target.get("cultivator_name"), "fight")
+			var am = get_node_or_null("/root/AudioManager")
+			if am: am.play_success()
 	
 	target = null
 
@@ -181,4 +199,6 @@ func _draw() -> void:
 	for f in _flashes:
 		var a: float = f["timer"] / 0.3
 		draw_circle(f["pos"], 45, Color(1, 1, 0.8, a * 0.5))
-		draw_line(f["pos"] - Vector2(0, 100), f["pos"], Color(1, 1, 0.9, a), 3)
+		var bolt: Array = f.get("bolt", [])
+		if bolt.size() >= 2:
+			draw_polyline(bolt, Color(1, 1, 0.95, a), 3)
