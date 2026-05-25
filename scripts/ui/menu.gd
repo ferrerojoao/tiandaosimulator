@@ -18,9 +18,7 @@ func _ready() -> void:
 	$ColorRect.color = Color(0.04, 0.06, 0.12, 0.55)
 	
 	# 标题样式
-	title.add_theme_color_override("font_color", Color(0.9, 0.82, 0.4))
 	title.add_theme_font_size_override("font_size", 64)
-	title.add_theme_font_override("font", null)
 	
 	# 按钮样式
 	_style_btn(btn_new, "新游戏")

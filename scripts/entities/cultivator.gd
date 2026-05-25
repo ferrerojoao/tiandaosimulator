@@ -67,6 +67,7 @@ var encounter_timer: int = 0
 var guided: bool = false
 var overflow_reported: bool = false
 var _loot_cooldown: float = 0.0
+var in_tribulation: bool = false
 var relations: Dictionary = {}  # { "对方名字": 数值 }
 var personality: int = Personality.STEADY
 var talent: int = Talent.SKY_WISDOM
@@ -191,6 +192,7 @@ func get_cultivation_mult() -> float:
 
 func _on_tick(_year: int, _season: int) -> void:
 	if not alive: return
+	if in_tribulation: return
 	if realm >= Realm.TRIBULATION: return
 	
 	# === 宗门俸禄（每年第一季） ===
@@ -252,8 +254,7 @@ func _on_tick(_year: int, _season: int) -> void:
 		speed_mult = 0.3
 		cursed_ticks -= 1
 		if randf() < 0.05:
-			die()
-			return
+			die(true, "被诅咒而死")
 	
 	if is_breaking_through:
 		breakthrough_progress += 1.0
@@ -395,16 +396,22 @@ func _finish_breakthrough() -> void:
 				injured_ticks = 15
 			Realm.NASCENT_SOUL:
 				injured_ticks = 30
-				if randf() < 0.2: die(); return
+				if randf() < 0.2: die(true, "突破失败"); return
 			Realm.DIVINE:
 				injured_ticks = 60
-				if randf() < 0.5: die(); return
+				if randf() < 0.5: die(true, "突破失败"); return
 		if eb:
 			eb.event_log_entry.emit("%s 突破 %s 失败" % [cultivator_name, REALM_NAMES[realm + 1]], "cult")
 
 func _process(delta: float) -> void:
 	if not alive: return
 	delta *= GameTime.speed_multipliers.get(GameTime.current_speed, 1.0)
+	
+	# 雷劫中：只做躲避
+	if in_tribulation:
+		_tribulation_dodge(delta)
+		return
+	
 	if is_breaking_through: return  # 闭关中不移动
 	if is_newborn:
 		_newborn_ai(delta)
@@ -424,6 +431,16 @@ func _process(delta: float) -> void:
 		wander_target = position + push * 200.0
 		position = position.move_toward(position + push * 50.0, move_speed * 3.0 * delta)
 		return
+	
+	# 雷劫区域排斥
+	var tm = get_node_or_null("/root/main/TribulationManager")
+	if tm and tm.active and not in_tribulation:
+		var d: float = position.distance_to(tm.center)
+		if d < tm.radius + 20:
+			var away: Vector2 = (position - tm.center).normalized()
+			wander_target = tm.center + away * (tm.radius + 60)
+			position = position.move_toward(wander_target, move_speed * 3.0 * delta)
+			return
 	
 	# 同宗避让
 	if sect != "" and not guided and ai_goal in ["游历", "寻灵修炼", "回宗采购", "前往京城采购", "筹备突破"]:
@@ -792,6 +809,41 @@ func curse(ticks: int) -> void:
 	cursed_ticks += ticks
 	queue_redraw()
 
+func tribulation_strike() -> bool:
+	"""天道雷劫惩罚。返回 true = 存活, false = 死亡"""
+	var survival_chance: float = 0.7
+	
+	# 境界加成 (每境界+5%，渡劫期额外+30%)
+	survival_chance += realm * 0.05
+	if realm == Realm.TRIBULATION:
+		survival_chance += 0.30
+	
+	# 根骨加成 (每10点+2%)
+	survival_chance += (root_bone - 50) * 0.002
+	
+	# 气运加成 (每20点+3%)
+	survival_chance += fortune * 0.0015
+	
+	# 赐福/诅咒影响
+	if blessed_ticks > 0:
+		survival_chance += 0.15
+	if cursed_ticks > 0:
+		survival_chance -= 0.20
+	
+	survival_chance = clampf(survival_chance, 0.05, 0.95)
+	
+	var survived: bool = randf() < survival_chance
+	
+	if survived:
+		injured_ticks = maxi(injured_ticks, 30)
+		cultivation_exp = maxf(0, cultivation_exp * 0.7)
+		_add_event("扛过天道雷劫")
+		queue_redraw()
+	else:
+		_add_event("死于天道雷劫")
+	
+	return survived
+
 # --- 关系 ---
 func _get_relation(other: Node) -> float:
 	return relations.get(other.get("cultivator_name"), 0.0)
@@ -923,6 +975,7 @@ func _try_exchange() -> void:
 	_add_event("购得%s(%d灵石)" % [item["name"], item["price"]])
 
 func _check_combat() -> void:
+	if in_tribulation: return
 	if combat_cooldown > 0:
 		combat_cooldown -= 1
 		return
@@ -1028,7 +1081,7 @@ func _check_combat() -> void:
 					if key.begins_with("cb_"): continue
 					if op[key] > 0:
 						inventory[key] = inventory.get(key, 0) + op[key]
-			c.die(false)  # 斩杀：不留物品
+			c.die(false, "被斩杀")  # 斩杀：不留物品
 			_mod_relation(c, -25)
 		for c in side_a:
 			if c != self:
@@ -1061,7 +1114,8 @@ func _check_combat() -> void:
 		if c != self:
 			c.combat_cooldown = 5.0
 
-func die(keep_items: bool = true) -> void:
+func die(keep_items: bool = true, cause: String = "陨落") -> void:
+	_add_event(cause)
 	# 替死符
 	if inventory.get("替死符", 0) > 0:
 		inventory["替死符"] -= 1
@@ -1078,7 +1132,7 @@ func die(keep_items: bool = true) -> void:
 	ts.set_script(load("res://scripts/entities/tombstone.gd"))
 	ts.position = position
 	ts.name = "Tombstone_" + cultivator_name
-	_copy_to_tombstone(ts, keep_items)
+	_copy_to_tombstone(ts, keep_items, cause)
 	var spawner = get_parent()
 	if spawner: spawner.add_child(ts)
 	
@@ -1090,7 +1144,7 @@ func die(keep_items: bool = true) -> void:
 		eb.event_log_entry.emit("%s 陨落" % cultivator_name, "fight")
 	queue_free()
 
-func _copy_to_tombstone(ts: Node, keep_items: bool) -> void:
+func _copy_to_tombstone(ts: Node, keep_items: bool, cause: String) -> void:
 	ts.set("cultivator_name", cultivator_name)
 	ts.set("realm", realm)
 	ts.set("age", age)
@@ -1107,9 +1161,31 @@ func _copy_to_tombstone(ts: Node, keep_items: bool) -> void:
 	ts.set("life_events", life_events.duplicate(true))
 	ts.set("techniques", techniques.duplicate(true))
 	ts.set("death_year", GameTime.current_year if get_node_or_null("/root/GameTime") else 0)
+	ts.set("death_cause", cause)
 	if keep_items:
 		ts.set("inventory", inventory.duplicate(true))
 		ts.set("spirit_stones", spirit_stones)
+
+func _tribulation_dodge(delta: float) -> void:
+	"""雷劫中躲避天雷"""
+	var tm = get_node_or_null("/root/main/TribulationManager")
+	if not tm or not tm.active: 
+		in_tribulation = false; return
+	# 境界越高移动越快（雷劫中拼命逃）
+	var trib_speed: float = move_speed * (2.0 + realm * 0.5)  # 2~4.5倍
+	var nearest: Vector2 = Vector2.ZERO
+	var nearest_dist: float = 999.0
+	for w in tm._warnings:
+		var d: float = position.distance_to(w["pos"])
+		if d < nearest_dist:
+			nearest_dist = d; nearest = w["pos"]
+	if nearest_dist < 120:
+		var away: Vector2 = (position - nearest).normalized()
+		position = position.move_toward(position + away * 80, trib_speed * delta)
+	# 保持圈内
+	var dist_to_center: float = position.distance_to(tm.center)
+	if dist_to_center > tm.radius - 20:
+		position = position.move_toward(tm.center, trib_speed * delta)
 
 func _try_loot_tombstone() -> void:
 	if _loot_cooldown > 0:

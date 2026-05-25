@@ -21,6 +21,16 @@ func _ready() -> void:
 	speed_label.add_theme_font_size_override("font_size", 16)
 	hm_label.add_theme_color_override("font_color", Color(1.0, 0.92, 0.6))
 	hm_label.add_theme_font_size_override("font_size", 16)
+	
+	# 存档/读档按钮
+	var btn_save = Button.new(); btn_save.text = "存档"
+	var btn_load = Button.new(); btn_load.text = "读档"
+	_style_btn(btn_save); _style_btn(btn_load)
+	btn_save.pressed.connect(func(): _do_save())
+	btn_load.pressed.connect(func(): _do_load())
+	$HBoxContainer.add_child(btn_save)
+	$HBoxContainer.add_child(btn_load)
+	
 	_update_display()
 	GameTime.season_changed.connect(_on_season_changed)
 	GameTime.speed_changed.connect(_on_speed_changed)
@@ -49,3 +59,27 @@ func _speed_name(s: int) -> String:
 		GameTime.Speed.ULTRA: return "5x"
 		GameTime.Speed.ULTRA2: return "10x"
 	return "??"
+
+func _style_btn(btn: Button) -> void:
+	btn.add_theme_font_size_override("font_size", 13)
+	btn.add_theme_color_override("font_color", Color(0.7, 0.68, 0.62))
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.85, 0.45))
+	var sb = StyleBoxFlat.new()
+	sb.bg_color = Color(0.1, 0.08, 0.18, 0.7)
+	sb.border_width_left = 1; sb.border_width_right = 1
+	sb.border_width_top = 1; sb.border_width_bottom = 1
+	sb.border_color = Color(0.78, 0.63, 0.31, 0.4)
+	sb.corner_radius_top_left = 4; sb.corner_radius_top_right = 4
+	sb.corner_radius_bottom_left = 4; sb.corner_radius_bottom_right = 4
+	sb.content_margin_left = 8; sb.content_margin_right = 8
+	btn.add_theme_stylebox_override("normal", sb)
+
+func _do_save() -> void:
+	var main = get_node_or_null("/root/main")
+	if main and main.has_method("save_game"):
+		main.save_game()
+
+func _do_load() -> void:
+	var main = get_node_or_null("/root/main")
+	if main and main.has_method("load_game"):
+		main.load_game()

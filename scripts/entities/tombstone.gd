@@ -19,6 +19,7 @@ var techniques: Array = []
 var inventory: Dictionary = {}
 var spirit_stones: int = 0
 var death_year: int = 0
+var death_cause: String = ""
 var lifetime: int = 80
 var ai_goal: String = "已陨落"
 var cultivation_exp: float = 0

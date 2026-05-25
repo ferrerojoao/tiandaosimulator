@@ -7,6 +7,10 @@ var _detail_popup: Control
 
 func _ready() -> void:
 	print("[Main] 场景初始化完成")
+	# 雷劫管理器
+	var tm = load("res://scripts/world/tribulation_manager.gd").new()
+	tm.name = "TribulationManager"
+	add_child(tm)
 	var eb = get_node_or_null("/root/EventBus")
 	if eb:
 		eb.request_cultivator_detail.connect(_on_detail_request)
@@ -15,8 +19,10 @@ func _on_detail_request(c: Node2D) -> void:
 	_show_detail_popup(c)
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.keycode == KEY_F5:
-		save_game()
+	if event is InputEventKey and event.pressed and event.keycode == KEY_SPACE:
+		var gt = get_node_or_null("/root/GameTime")
+		if gt: gt.toggle_pause()
+		get_viewport().set_input_as_handled()
 	if not (event is InputEventMouseButton): return
 	if not event.pressed: return
 	var cam = $Camera2D
@@ -138,6 +144,12 @@ func _screen_to_world(screen_pos: Vector2) -> Vector2:
 	return cam.get_screen_center_position() + (screen_pos - get_viewport().get_visible_rect().size / 2.0) / cam.zoom
 
 func _left_click(world_pos: Vector2) -> void:
+	# 雷劫中手动落雷
+	var tm = get_node_or_null("TribulationManager")
+	if tm and tm.active:
+		tm.strike_at(world_pos)
+		return
+	
 	var spawner = $CultivatorSpawner
 	if not spawner: return
 	var best_sect: Node2D
@@ -180,7 +192,8 @@ func _right_click(world_pos: Vector2, screen_pos: Vector2) -> void:
 		var c = selected_cultivator
 		popup.add_item("赐福 (20 天道值)", 0)
 		popup.add_item("诅咒 (30 天道值)", 1)
-		popup.add_item("抹杀 (10 天道值)", 2)
+		# popup.add_item("抹杀 (10 天道值)", 2)  # 暂时屏蔽
+		popup.add_item("雷劫 (50 天道值)", 3)
 		popup.position = screen_pos
 		popup.id_pressed.connect(func(id: int):
 			var gt = get_node_or_null("/root/GameTime")
@@ -196,11 +209,16 @@ func _right_click(world_pos: Vector2, screen_pos: Vector2) -> void:
 						c.curse(10)
 						if eb: eb.event_log_entry.emit("%s 被天道诅咒" % c.cultivator_name, "hm")
 					elif eb: eb.event_log_entry.emit("天道值不足 (需要 30)", "hm")
-				2:
-					if gt and gt.spend_hm(10):
-						if eb: eb.event_log_entry.emit("%s 被天道抹杀" % c.cultivator_name, "fight")
-						c.die()  # 抹杀留遗物
-					elif eb: eb.event_log_entry.emit("天道值不足 (需要 10)", "hm")
+				3:
+					if gt and gt.spend_hm(50):
+						if c.get("is_newborn"):
+							if eb: eb.event_log_entry.emit("新生修士不可降雷劫", "hm")
+						else:
+							var tm = get_node_or_null("TribulationManager")
+							if tm:
+								tm.start_tribulation(c)
+								if eb: eb.event_log_entry.emit("天道降下雷劫！", "hm")
+					elif eb: eb.event_log_entry.emit("天道值不足 (需要 50)", "hm")
 		)
 	else:
 		popup.add_item("灵潮 (30 天道值)", 0)
@@ -379,6 +397,9 @@ func _show_detail_popup(c: Node2D) -> void:
 		c.get("age"),
 		" (已故)" if str(c.name).begins_with("Tombstone_") else ""
 	]))
+	var dc = c.get("death_cause")
+	if dc and dc != "":
+		vbox.add_child(_dl_label("死因: %s" % dc))
 	var ne: float = c.get("EXP_TO_NEXT")[c.get("realm")] if c.get("realm") < c.get("EXP_TO_NEXT").size() else -1
 	vbox.add_child(_dl_label("修为: %.0f / %.0f" % [c.get("cultivation_exp"), ne] if ne > 0 else "修为: %.0f (圆满)" % c.get("cultivation_exp")))
 	vbox.add_child(_dl_label("战绩: %d胜 %d败" % [c.get("wins"), c.get("losses")]))
