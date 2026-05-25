@@ -180,6 +180,7 @@ func _right_click(world_pos: Vector2, screen_pos: Vector2) -> void:
 		var c = selected_cultivator
 		popup.add_item("赐福 (20 天道值)", 0)
 		popup.add_item("诅咒 (30 天道值)", 1)
+		popup.add_item("抹杀 (10 天道值)", 2)
 		popup.position = screen_pos
 		popup.id_pressed.connect(func(id: int):
 			var gt = get_node_or_null("/root/GameTime")
@@ -195,6 +196,11 @@ func _right_click(world_pos: Vector2, screen_pos: Vector2) -> void:
 						c.curse(10)
 						if eb: eb.event_log_entry.emit("%s 被天道诅咒" % c.cultivator_name, "hm")
 					elif eb: eb.event_log_entry.emit("天道值不足 (需要 30)", "hm")
+				2:
+					if gt and gt.spend_hm(10):
+						if eb: eb.event_log_entry.emit("%s 被天道抹杀" % c.cultivator_name, "fight")
+						c.die()  # 抹杀留遗物
+					elif eb: eb.event_log_entry.emit("天道值不足 (需要 10)", "hm")
 		)
 	else:
 		popup.add_item("灵潮 (30 天道值)", 0)
@@ -352,7 +358,11 @@ func _show_detail_popup(c: Node2D) -> void:
 	var pn: Array = c.get("PERSONALITY_NAMES")
 	var tn: Array = c.get("TALENT_NAMES")
 	vbox.add_child(_dl_label("性格: %s  天赋: %s" % [pn[c.get("personality")], tn[c.get("talent")]]))
-	vbox.add_child(_dl_label("宗门: %s  年龄: %d" % [c.get("sect") if c.get("sect") else "散修", c.get("age")]))
+	vbox.add_child(_dl_label("宗门: %s  年龄: %d%s" % [
+		c.get("sect") if c.get("sect") else "散修", 
+		c.get("age"),
+		" (已故)" if str(c.name).begins_with("Tombstone_") else ""
+	]))
 	var ne: float = c.get("EXP_TO_NEXT")[c.get("realm")] if c.get("realm") < c.get("EXP_TO_NEXT").size() else -1
 	vbox.add_child(_dl_label("修为: %.0f / %.0f" % [c.get("cultivation_exp"), ne] if ne > 0 else "修为: %.0f (圆满)" % c.get("cultivation_exp")))
 	vbox.add_child(_dl_label("战绩: %d胜 %d败" % [c.get("wins"), c.get("losses")]))

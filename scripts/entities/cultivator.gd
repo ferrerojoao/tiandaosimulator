@@ -66,6 +66,7 @@ var is_in_encounter: bool = false
 var encounter_timer: int = 0
 var guided: bool = false
 var overflow_reported: bool = false
+var _loot_cooldown: float = 0.0
 var relations: Dictionary = {}  # { "对方名字": 数值 }
 var personality: int = Personality.STEADY
 var talent: int = Talent.SKY_WISDOM
@@ -292,7 +293,11 @@ func _attempt_breakthrough() -> void:
 	# 高境界需要特殊物品
 	var item_id: String = BREAK_ITEMS.get(realm, "")
 	if item_id != "" and inventory.get(item_id, 0) <= 0:
-		ai_goal = "寻求" + item_id
+		var items_data = load("res://scripts/data/items.gd")
+		var item_name: String = item_id
+		for p in items_data.PILLS + items_data.SPECIALS:
+			if p.get("id") == item_id: item_name = p["name"]; break
+		ai_goal = "寻求" + item_name
 		return  # 缺必备物品
 	
 	is_breaking_through = true
@@ -440,6 +445,8 @@ func _process(delta: float) -> void:
 	wander_cooldown -= delta
 	if wander_cooldown <= 0.0:
 		_decide_behavior()
+	# 经过墓碑时拾取
+	_try_loot_tombstone()
 	if position.distance_to(wander_target) > 4.0:
 		position = position.move_toward(wander_target, move_speed * delta)
 	elif guided:
@@ -525,7 +532,11 @@ func _decide_behavior() -> void:
 	if cultivation_exp >= EXP_TO_NEXT[realm]:
 		var item_id: String = BREAK_ITEMS.get(realm, "")
 		if item_id != "" and inventory.get(item_id, 0) <= 0:
-			ai_goal = "寻求" + item_id
+			var items_data = load("res://scripts/data/items.gd")
+			var item_name: String = item_id
+			for p in items_data.PILLS + items_data.SPECIALS:
+				if p.get("id") == item_id: item_name = p["name"]; break
+			ai_goal = "寻求" + item_name
 			# 优先去最近的奇遇点
 			if _try_go_encounter(): return
 			_pick_wander_target()
@@ -1017,7 +1028,7 @@ func _check_combat() -> void:
 					if key.begins_with("cb_"): continue
 					if op[key] > 0:
 						inventory[key] = inventory.get(key, 0) + op[key]
-			c.die()
+			c.die(false)  # 斩杀：不留物品
 			_mod_relation(c, -25)
 		for c in side_a:
 			if c != self:
@@ -1050,7 +1061,7 @@ func _check_combat() -> void:
 		if c != self:
 			c.combat_cooldown = 5.0
 
-func die() -> void:
+func die(keep_items: bool = true) -> void:
 	# 替死符
 	if inventory.get("替死符", 0) > 0:
 		inventory["替死符"] -= 1
@@ -1059,14 +1070,75 @@ func die() -> void:
 		if eb2:
 			eb2.event_log_entry.emit("%s 消耗替死符躲过死劫" % cultivator_name, "item")
 		return
+	
 	alive = false
 	visible = false
+	# 造墓碑
+	var ts = Node2D.new()
+	ts.set_script(load("res://scripts/entities/tombstone.gd"))
+	ts.position = position
+	ts.name = "Tombstone_" + cultivator_name
+	_copy_to_tombstone(ts, keep_items)
+	var spawner = get_parent()
+	if spawner: spawner.add_child(ts)
+	
 	var gt = get_node_or_null("/root/GameTime")
 	if gt: gt.add_hm((realm + 1) * 3)
 	var eb = get_node_or_null("/root/EventBus")
 	if eb:
 		eb.cultivator_died.emit(self)
 		eb.event_log_entry.emit("%s 陨落" % cultivator_name, "fight")
+	queue_free()
+
+func _copy_to_tombstone(ts: Node, keep_items: bool) -> void:
+	ts.set("cultivator_name", cultivator_name)
+	ts.set("realm", realm)
+	ts.set("age", age)
+	ts.set("personality", personality)
+	ts.set("talent", talent)
+	ts.set("sect", sect)
+	ts.set("wins", wins)
+	ts.set("losses", losses)
+	ts.set("spirit_root", spirit_root)
+	ts.set("spirit_element", spirit_element)
+	ts.set("root_bone", root_bone)
+	ts.set("comprehension", comprehension)
+	ts.set("fortune", fortune)
+	ts.set("life_events", life_events.duplicate(true))
+	ts.set("techniques", techniques.duplicate(true))
+	ts.set("death_year", GameTime.current_year if get_node_or_null("/root/GameTime") else 0)
+	if keep_items:
+		ts.set("inventory", inventory.duplicate(true))
+		ts.set("spirit_stones", spirit_stones)
+
+func _try_loot_tombstone() -> void:
+	if _loot_cooldown > 0:
+		_loot_cooldown -= 0.016  # ~60fps, 1秒冷却
+		return
+	var spawner = get_parent()
+	if not spawner: return
+	for child in spawner.get_children():
+		if not child.has_method("try_loot"): continue
+		if position.distance_to(child.position) > 80: continue
+		if randf() > 0.5: return
+		var loot = child.try_loot()
+		if loot.is_empty(): return
+		_loot_cooldown = 2.0
+		if loot.has("stones"):
+			spirit_stones += loot["stones"]
+			var eb = get_node_or_null("/root/EventBus")
+			if eb: eb.event_log_entry.emit("%s 从墓碑拾取%d灵石" % [cultivator_name, loot["stones"]], "cult")
+		elif loot.has("item"):
+			var item_id: String = loot["item"]
+			inventory[item_id] = inventory.get(item_id, 0) + 1
+			var items_data = load("res://scripts/data/items.gd")
+			var item_name: String = item_id
+			for p in items_data.PILLS + items_data.TECHNIQUES + items_data.SPECIALS + items_data.COMBAT_ITEMS:
+				if p["id"] == item_id: item_name = p["name"]; break
+			_add_event("墓碑获%s" % item_name)
+			var eb = get_node_or_null("/root/EventBus")
+			if eb: eb.event_log_entry.emit("%s 从墓碑拾取%s" % [cultivator_name, item_name], "cult")
+		return
 
 func _add_event(text: String) -> void:
 	var gt = get_node_or_null("/root/GameTime")
