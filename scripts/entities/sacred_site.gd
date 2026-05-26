@@ -24,11 +24,8 @@ func setup(p_element: int, p_name: String, p_pos: Vector2) -> void:
 	if _icons.is_empty():
 		for i in 16:
 			var path = "res://assets/tiles/sacred_%d.png" % i
-			var real = path.replace("res://", "")
-			if FileAccess.file_exists(real):
+			if ResourceLoader.exists(path):
 				_icons.append(load(path))
-			else:
-				break
 	var icon_idx: int = ELEMENT_ICON_MAP[element] if element < ELEMENT_ICON_MAP.size() else element
 	if icon_idx < _icons.size():
 		_sprite.texture = _icons[icon_idx]
