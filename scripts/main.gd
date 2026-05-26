@@ -23,6 +23,11 @@ func _input(event: InputEvent) -> void:
 		var gt = get_node_or_null("/root/GameTime")
 		if gt: gt.toggle_pause()
 		get_viewport().set_input_as_handled()
+	if event is InputEventKey and event.pressed and event.keycode == KEY_F11:
+		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
 	if not (event is InputEventMouseButton): return
 	if not event.pressed: return
 	var cam = $Camera2D
