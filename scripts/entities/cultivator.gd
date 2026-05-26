@@ -899,7 +899,7 @@ func _tick_learning() -> void:
 			var tech: Dictionary = _tech_cache.get(key, {})
 			if tech.is_empty(): continue
 			var g: int = tech.get("grade", 0)
-			if spirit_root < grade and spirit_root < 3: continue  # 天灵根可学所有
+			if spirit_root < g and spirit_root < 3: continue  # 天灵根可学所有
 			# 检查是否已学会
 			var known: bool = false
 			for t in techniques:
