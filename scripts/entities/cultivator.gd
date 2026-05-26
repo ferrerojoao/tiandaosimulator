@@ -104,7 +104,7 @@ func _ready() -> void:
 	if _icon_textures.is_empty():
 		for i in 16:
 			var path = "res://assets/tiles/cultivator_%d.png" % i
-			if FileAccess.file_exists(path.replace("res://", "")):
+			if ResourceLoader.exists(path):
 				_icon_textures.append(load(path))
 			else:
 				break
@@ -899,7 +899,7 @@ func _tick_learning() -> void:
 			var tech: Dictionary = _tech_cache.get(key, {})
 			if tech.is_empty(): continue
 			var g: int = tech.get("grade", 0)
-			if spirit_root < g: continue  # 灵根不足
+			if spirit_root < grade and spirit_root < 3: continue  # 天灵根可学所有
 			# 检查是否已学会
 			var known: bool = false
 			for t in techniques:
@@ -919,8 +919,8 @@ func _tick_learning() -> void:
 		learn_book = ""; return
 	
 	var grade: int = tech.get("grade", 0)
-	if spirit_root < grade:
-		learn_book = ""; return  # 灵根变了，放弃
+	if spirit_root < grade and spirit_root < 3:
+		learn_book = ""; return  # 灵根不够
 	
 	# 悟性决定速度：每季 progress
 	var speed: float = comprehension / 800.0  # 100悟性→每季 0.125

@@ -48,8 +48,7 @@ func setup(p_idx: int, p_pos: Vector2, p_name: String = "", p_capital: bool = fa
 	if _icons.is_empty():
 		for i in 16:
 			var path = "res://assets/tiles/sect_%d.png" % i
-			var real = path.replace("res://", "")
-			if FileAccess.file_exists(real):
+			if ResourceLoader.exists(path):
 				_icons.append(load(path))
 			else:
 				break

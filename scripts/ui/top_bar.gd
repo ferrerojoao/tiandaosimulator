@@ -31,6 +31,18 @@ func _ready() -> void:
 	$HBoxContainer.add_child(btn_save)
 	$HBoxContainer.add_child(btn_load)
 	
+	# 静音按钮
+	var btn_mute = Button.new()
+	_style_btn(btn_mute)
+	update_mute_btn(btn_mute)
+	btn_mute.pressed.connect(func():
+		var am = get_node_or_null("/root/AudioManager")
+		if am:
+			var muted: bool = am.toggle_mute()
+			update_mute_btn(btn_mute, muted)
+	)
+	$HBoxContainer.add_child(btn_mute)
+	
 	_update_display()
 	GameTime.season_changed.connect(_on_season_changed)
 	GameTime.speed_changed.connect(_on_speed_changed)
@@ -61,6 +73,7 @@ func _speed_name(s: int) -> String:
 	return "??"
 
 func _style_btn(btn: Button) -> void:
+	btn.custom_minimum_size = Vector2(48, 28)
 	btn.add_theme_font_size_override("font_size", 13)
 	btn.add_theme_color_override("font_color", Color(0.7, 0.68, 0.62))
 	btn.add_theme_color_override("font_hover_color", Color(1.0, 0.85, 0.45))
@@ -83,3 +96,6 @@ func _do_load() -> void:
 	var main = get_node_or_null("/root/main")
 	if main and main.has_method("load_game"):
 		main.load_game()
+
+func update_mute_btn(btn: Button, muted: bool = false) -> void:
+	btn.text = "静音" if not muted else "播放"
