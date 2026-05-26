@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="修仙世界模拟器"
+config/name="天道模拟器"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
@@ -20,15 +20,14 @@ config/icon="res://icon.svg"
 EventBus="*res://scripts/autoload/event_bus.gd"
 GameTime="*res://scripts/autoload/game_time.gd"
 SaveManager="*res://scripts/autoload/save_manager.gd"
-AudioManager="*res://scripts/autoload/audio_manager.gd"
 EncounterManager="*res://scripts/world/encounter_manager.gd"
 MCPRuntimeProbe="*res://addons/godot_mcp/runtime/mcp_runtime_probe.gd"
+AudioManager="*res://scripts/autoload/audio_manager.gd"
 
 [display]
 
 window/size/viewport_width=1920
 window/size/viewport_height=1080
-window/size/resizable=true
 window/stretch/mode="canvas_items"
 
 [editor_plugins]

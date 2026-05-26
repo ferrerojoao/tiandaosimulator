@@ -187,7 +187,7 @@ offset_bottom = 120.0
 
 [node name="Title" type="Label" parent="UI/Menu/VBoxContainer" unique_id=400000004]
 layout_mode = 2
-text = "修仙世界模拟器"
+text = "天道模拟器"
 horizontal_alignment = 1
 
 [node name="HSeparator" type="HSeparator" parent="UI/Menu/VBoxContainer" unique_id=400000005]

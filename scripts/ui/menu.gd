@@ -17,6 +17,17 @@ func _ready() -> void:
 	# 减少暗色遮罩透明度让背景透出
 	$ColorRect.color = Color(0.04, 0.06, 0.12, 0.55)
 	
+	# 右下角署名
+	var sig = Label.new()
+	sig.text = "ferrerojoao制作"
+	sig.add_theme_font_size_override("font_size", 18)
+	sig.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 0.7))
+	sig.anchor_left = 1.0; sig.anchor_right = 1.0
+	sig.anchor_top = 1.0; sig.anchor_bottom = 1.0
+	sig.offset_left = -160; sig.offset_top = -32
+	sig.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(sig)
+	
 	# 标题样式
 	title.add_theme_font_size_override("font_size", 64)
 	
