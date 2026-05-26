@@ -41,6 +41,8 @@ func _input(event: InputEvent) -> void:
 func start_new_game() -> void:
 	var am = get_node_or_null("/root/AudioManager")
 	if am: am.play_bgm("游戏音乐.ogg")
+	var el = $UI/EventLog
+	if el and el.has_method("clear"): el.clear()
 	$UI/Menu.hide()
 	$WorldMap.generate_world()
 	$CultivatorSpawner.spawn_all()
@@ -53,6 +55,8 @@ func load_game() -> void:
 	if not sm: return
 	var data: Dictionary = sm.load_game()
 	if data.is_empty(): return
+	var el = $UI/EventLog
+	if el and el.has_method("clear"): el.clear()
 	$UI/Menu.hide()
 	
 	var gt = get_node_or_null("/root/GameTime")

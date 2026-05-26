@@ -33,3 +33,7 @@ func _add_entry(text: String, category: String) -> void:
 func _toggle() -> void:
 	$VBoxContainer/Scroll.visible = not $VBoxContainer/Scroll.visible
 	btn_toggle.text = "展开" if not $VBoxContainer/Scroll.visible else "收起"
+
+func clear() -> void:
+	for child in entries.get_children():
+		child.queue_free()

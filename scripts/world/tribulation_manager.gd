@@ -158,6 +158,7 @@ func end_tribulation(survived: bool) -> void:
 	set_process(false)
 	_warnings.clear()
 	_flashes.clear()
+	_striking = false
 	
 	var gt = get_node_or_null("/root/GameTime")
 	if gt and _speed_locked:
